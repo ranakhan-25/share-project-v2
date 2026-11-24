@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Scale,
   Search,
+  Share2,
   ShieldCheck,
   Sparkles,
   Table as TableIcon,
@@ -46,6 +47,7 @@ import {
   clearCompareApi,
   type ShareApiProject,
 } from "@/lib/share-project-api";
+import { ShareProjectModal } from "@/components/share/ShareProjectModal";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=900&q=80";
@@ -74,6 +76,9 @@ export default function AllProjectsDashboardPage() {
   const [compareList, setCompareList] = useState<ProjectItem[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [compareWarning, setCompareWarning] = useState("");
+
+  // Share modal state
+  const [sharingProject, setSharingProject] = useState<ProjectItem | null>(null);
 
   // Load initial projects, categories, wishlist & compare list
   useEffect(() => {
@@ -512,6 +517,16 @@ export default function AllProjectsDashboardPage() {
                     >
                       <Heart className={`h-4 w-4 ${isWishlisted ? "fill-white" : ""}`} />
                     </button>
+
+                    {/* Share Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSharingProject(p)}
+                      title={t({ bn: "প্রজেক্ট শেয়ার করুন", en: "Share project" })}
+                      className="grid h-8.5 w-8.5 place-items-center rounded-full bg-white/80 backdrop-blur-md text-slate-700 hover:bg-white hover:text-blue-600 transition"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </button>
                   </div>
 
                   {/* Location & Title over image */}
@@ -704,6 +719,15 @@ export default function AllProjectsDashboardPage() {
                             title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
                           >
                             <Heart className={`h-4 w-4 ${isWishlisted ? "fill-rose-500" : ""}`} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSharingProject(p)}
+                            className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 hover:bg-slate-50 transition"
+                            title={t({ bn: "শেয়ার করুন", en: "Share project" })}
+                          >
+                            <Share2 className="h-4 w-4" />
                           </button>
 
                           <Link
@@ -1024,6 +1048,13 @@ export default function AllProjectsDashboardPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Share Project Modal */}
+      <ShareProjectModal
+        open={!!sharingProject}
+        onClose={() => setSharingProject(null)}
+        project={sharingProject}
+      />
     </div>
   );
 }

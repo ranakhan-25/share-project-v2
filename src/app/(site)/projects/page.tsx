@@ -13,6 +13,7 @@ import {
   MapPin,
   PlusCircle,
   Search,
+  Share2,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { PageHero } from "@/components/site/sections/PageHero";
+import { ShareProjectModal } from "@/components/share/ShareProjectModal";
 import type { OwnerProject } from "@/lib/owner-projects";
 import type { InvestorProject } from "@/data/investorProjects";
 
@@ -33,6 +35,7 @@ export default function ProjectsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalProjects, setTotalProjects] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [sharingProject, setSharingProject] = useState<{ id: string; name: string; location?: string } | null>(null);
   const pageSize = 9;
 
   useEffect(() => {
@@ -413,6 +416,20 @@ export default function ProjectsPage() {
                       <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-emerald-700">
                         {t(project.category)}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSharingProject({
+                            id: project.id,
+                            name: t(project.name),
+                            location: t(project.location),
+                          })
+                        }
+                        title={t({ bn: "প্রজেক্ট শেয়ার করুন", en: "Share project" })}
+                        className="absolute right-4 top-4 grid h-8.5 w-8.5 place-items-center rounded-full bg-white/90 backdrop-blur-md text-slate-700 hover:bg-white hover:text-blue-600 shadow-sm transition"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </button>
                     </div>
                     <div className="p-6">
                       <p className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -556,6 +573,13 @@ export default function ProjectsPage() {
           )}
         </div>
       </section>
+
+      {/* Share Project Modal */}
+      <ShareProjectModal
+        open={!!sharingProject}
+        onClose={() => setSharingProject(null)}
+        project={sharingProject}
+      />
     </>
   );
 }

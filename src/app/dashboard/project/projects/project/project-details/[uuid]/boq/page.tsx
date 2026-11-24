@@ -1,6 +1,7 @@
 "use client";
 
 import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -95,6 +96,9 @@ const ACCOUNT_HEAD_OPTIONS = [
 export default function BoqPage() {
   const params = useParams();
   const projectUuid = params.uuid as string;
+
+  const storedUser = getStoredUser();
+  const userEmail = storedUser?.email?.toLowerCase()?.trim() || "";
 
   const [boqList, setBoqList] = useState<BoqItem[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -447,7 +451,7 @@ export default function BoqPage() {
                     placeholder="Select Title/Name of Work..."
                     options={TITLE_OPTIONS.map((t) => ({ value: t, label: t }))}
                     value={form.titleOfWork}
-                    onChange={(val) => setForm({ ...form, titleOfWork: val })}
+                    onChange={(val: any) => setForm({ ...form, titleOfWork: val })}
                   />
                   <button type="button" className="bg-purple-600 text-white px-3 rounded">+</button>
                 </div>
@@ -468,7 +472,7 @@ export default function BoqPage() {
                   placeholder="Select Project Type..."
                   options={projectTypes.map((t) => ({ value: t.name, label: t.name }))}
                   value={form.projectType}
-                  onChange={(val) => setForm({ ...form, projectType: val })}
+                  onChange={(val: any) => setForm({ ...form, projectType: val })}
                 />
               </div>
 
@@ -478,7 +482,7 @@ export default function BoqPage() {
                   placeholder="Select Project..."
                   options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
                   value={form.projectId}
-                  onChange={(val) => setForm({ ...form, projectId: val })}
+                  onChange={(val: any) => setForm({ ...form, projectId: val })}
                 />
               </div>
             </div>
@@ -490,7 +494,7 @@ export default function BoqPage() {
                   placeholder="Select Site..."
                   options={projectSites.map((s) => ({ value: s.name, label: s.name, subLabel: s.location }))}
                   value={form.site}
-                  onChange={(val) => setForm({ ...form, site: val })}
+                  onChange={(val: any) => setForm({ ...form, site: val })}
                 />
               </div>
 
@@ -501,7 +505,7 @@ export default function BoqPage() {
                   placeholder="Select Task..."
                   options={tasks.map((t) => ({ value: t.taskName, label: t.taskName }))}
                   value={form.task}
-                  onChange={(val) => setForm({ ...form, task: val })}
+                  onChange={(val: any) => setForm({ ...form, task: val })}
                 />
               </div>
 
