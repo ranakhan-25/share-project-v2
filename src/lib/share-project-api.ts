@@ -302,3 +302,71 @@ export async function toggleWishlistApi(uuid: string): Promise<{ wishlisted: boo
     }
   }
 }
+
+/* ==================== PROJECT COMPARE APIS ==================== */
+
+export async function getCompareListApi(): Promise<any[]> {
+  try {
+    const res = await api.get('/realbizpro/api/v1/share-project/compare');
+    const data = res.data?.data || res.data;
+    if (Array.isArray(data)) {
+      try {
+        localStorage.setItem('share-project:compare-list', JSON.stringify(data));
+      } catch {}
+      return data;
+    }
+    return [];
+  } catch {
+    try {
+      const local = localStorage.getItem('share-project:compare-list');
+      return local ? JSON.parse(local) : [];
+    } catch {
+      return [];
+    }
+  }
+}
+
+export async function toggleCompareApi(projectUuid: string): Promise<{ action: 'added' | 'removed'; list: any[] }> {
+  try {
+    const res = await api.post('/realbizpro/api/v1/share-project/compare/toggle', { projectUuid });
+    const data = res.data?.data || res.data;
+    const list = Array.isArray(data?.list) ? data.list : [];
+    try {
+      localStorage.setItem('share-project:compare-list', JSON.stringify(list));
+    } catch {}
+    return { action: data?.action || 'added', list };
+  } catch (err: any) {
+    if (err?.response?.data?.message) {
+      throw new Error(err.response.data.message);
+    }
+    throw err;
+  }
+}
+
+export async function removeCompareApi(projectUuid: string): Promise<any[]> {
+  try {
+    const res = await api.delete(`/realbizpro/api/v1/share-project/compare/${encodeURIComponent(projectUuid)}`);
+    const data = res.data?.data || res.data;
+    const list = Array.isArray(data?.list) ? data.list : [];
+    try {
+      localStorage.setItem('share-project:compare-list', JSON.stringify(list));
+    } catch {}
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+export async function clearCompareApi(): Promise<void> {
+  try {
+    await api.delete('/realbizpro/api/v1/share-project/compare');
+    try {
+      localStorage.removeItem('share-project:compare-list');
+    } catch {}
+  } catch {
+    try {
+      localStorage.removeItem('share-project:compare-list');
+    } catch {}
+  }
+}
+
