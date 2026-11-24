@@ -1861,12 +1861,13 @@ export default function ShareProjectAdminDashboardPage() {
                                     <div className="flex items-center justify-end gap-1.5">
                                       <button
                                         onClick={() => {
-                                          setUserForm({
+                                          setUserForm((prev) => ({
+                                            ...prev,
                                             name: String(u.name || ""),
                                             email: String(u.email || ""),
                                             phone: String(u.phone || u.mobileNo || ""),
                                             password: "",
-                                          });
+                                          }));
                                           setUserModal({ open: true, item: u });
                                         }}
                                         className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
