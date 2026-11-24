@@ -1,0 +1,1421 @@
+/* eslint-disable no-useless-catch */
+/* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
+
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Plus,
+  Search,
+  ArrowLeft,
+  X,
+  Loader2,
+  ChevronDown,
+  Eye,
+  Printer,
+  Mail,
+  Pencil,
+  Trash2,
+  ChevronRight,
+} from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+
+// ==================== API CONFIG ====================
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
+const API_PREFIX = "/realbizpro/api/v1";
+
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("share-project:access-token") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
+export default function WorkOrderPage() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dropdownError, setDropdownError] = useState<string | null>(null);
+  const [selectedListProjectId, setSelectedListProjectId] = useState("");
+
+  // Modals
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [editingOrderUuid, setEditingOrderUuid] = useState<string | null>(null);
+
+  // Master Dropdown Data
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [projectTypes, setProjectTypes] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subCategories, setSubCategories] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [sites, setSites] = useState<any[]>([]);
+  const [categoryId, setCategoryId] = useState("");
+  const [subCategoryId, setSubCategoryId] = useState("");
+
+  // Form State
+  const [formData, setFormData] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    code: `CW0000${Math.floor(10 + Math.random() * 90)}`,
+    customerId: "",
+    clientOrderNo: "",
+    projectTypeId: "",
+    projectId: "",
+    siteId: "",
+    attachment: "",
+    poNo: "",
+    vatPercent: 0,
+    vatInclude: false,
+    aitPercent: 0,
+    aitInclude: false,
+  });
+
+  const [orderItems, setOrderItems] = useState<any[]>([]);
+
+  // Action Dropdown State
+  const [openActionIndex, setOpenActionIndex] = useState<number | null>(null);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
+
+  // Calculate Totals
+  const subtotal = orderItems.reduce(
+    (acc, item) => acc + item.quantity * item.rate,
+    0,
+  );
+  const vatAmount = formData.vatInclude
+    ? (subtotal * formData.vatPercent) / 100
+    : 0;
+  const aitAmount = formData.aitInclude
+    ? (subtotal * formData.aitPercent) / 100
+    : 0;
+  const grandTotal = subtotal + vatAmount + aitAmount;
+
+  // ==================== API FETCHERS ====================
+  const fetchOptions = async (endpoint: string) => {
+    try {
+      const res = await fetch(
+        `${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`,
+        { headers: getAuthHeaders() },
+      );
+      if (!res.ok) {
+        throw new Error(`${endpoint} returned ${res.status}`);
+      }
+      const json = await res.json();
+      const rows = Array.isArray(json?.data?.data)
+        ? json.data.data
+        : Array.isArray(json?.data)
+          ? json.data
+          : Array.isArray(json)
+            ? json
+            : [];
+      return rows.map((r: any) => ({
+        ...r,
+        uuid: r.uuid || r.id,
+        projectId: r.projectId || r.project?.uuid || r.details?.projectId,
+        details: r.details || {},
+        rate: Number(r.details?.salePrice ?? r.amount ?? 0),
+        unit: r.details?.unit || "Nos",
+        description: r.description || "",
+        name:
+          r.name ||
+          r.customerName ||
+          r.siteName ||
+          r.projectName ||
+          r.title ||
+          r.itemName ||
+          r.code ||
+          "Unnamed",
+      }));
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const loadDropdowns = useCallback(async () => {
+    setDropdownError(null);
+    const results = await Promise.allSettled([
+      fetchOptions("/customer-account"),
+      fetchOptions("/project"),
+      fetchOptions("/project-type"),
+      fetchOptions("/category"),
+      fetchOptions("/billing-sub-category"),
+      fetchOptions("/project-billing/bill-items"),
+      fetchOptions("/project-sites"),
+    ]);
+    const failedEndpoints = results
+      .map((result, index) =>
+        result.status === "rejected"
+          ? [
+              "customers",
+              "projects",
+              "project types",
+              "categories",
+              "sub-categories",
+              "items",
+              "sites",
+            ][index]
+          : null,
+      )
+      .filter(Boolean);
+    if (failedEndpoints.length) {
+      setDropdownError(`Could not load: ${failedEndpoints.join(", ")}.`);
+    }
+    const values = results.map((result) =>
+      result.status === "fulfilled" ? result.value : [],
+    );
+    setCustomers(values[0]);
+    setProjects(values[1]);
+    setProjectTypes(values[2]);
+    setCategories(values[3]);
+    setSubCategories(values[4]);
+    setItems(values[5]);
+    setSites(values[6]);
+  }, []);
+
+  const loadOrders = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      // ⚠️ Endpoint apnar backend onujayi change korte hobe
+      const res = await fetch(
+        `${API_BASE}${API_PREFIX}/project-billing/work-orders?page=1&limit=100`,
+        { headers: getAuthHeaders() },
+      );
+      if (!res.ok) throw new Error("Failed to load work orders");
+      const json = await res.json();
+      setOrders(json?.data?.data || json?.data || []);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+    loadDropdowns();
+  }, [loadOrders, loadDropdowns]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        actionMenuRef.current &&
+        !actionMenuRef.current.contains(event.target as Node)
+      ) {
+        setOpenActionIndex(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // ==================== HANDLERS ====================
+  const resetOrderForm = () => {
+    setEditingOrderUuid(null);
+    setCategoryId("");
+    setSubCategoryId("");
+    setOrderItems([]);
+    setFormData({
+      date: new Date().toISOString().slice(0, 10),
+      code: `CW0000${Math.floor(10 + Math.random() * 90)}`,
+      customerId: "",
+      clientOrderNo: "",
+      projectTypeId: "",
+      projectId: "",
+      siteId: "",
+      attachment: "",
+      poNo: "",
+      vatPercent: 0,
+      vatInclude: false,
+      aitPercent: 0,
+      aitInclude: false,
+    });
+  };
+
+  const openNewOrder = () => {
+    resetOrderForm();
+    setIsAddOpen(true);
+  };
+
+  const handleAddItemToTable = () => {
+    setOrderItems([
+      ...orderItems,
+      {
+        id: String(Date.now()),
+        itemName: "",
+        description: "",
+        unit: "Nos",
+        quantity: 1,
+        rate: 0,
+        amount: 0,
+      },
+    ]);
+    setIsItemModalOpen(false);
+  };
+
+  const handleSaveOrder = async () => {
+    try {
+      setLoading(true);
+      if (!formData.projectId) throw new Error("Select a project");
+      const dateStr = formData.date
+        ? String(formData.date).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      const payload: Record<string, any> = {
+        title: `Work Order ${formData.code}`,
+        date: dateStr,
+        recordDate: dateStr,
+        code: formData.code,
+        projectId: formData.projectId,
+        items: orderItems.map(({ id, ...item }) => item),
+        subtotal: Number(subtotal || 0),
+        vatPercent: Number(formData.vatPercent || 0),
+        vatInclude: Boolean(formData.vatInclude),
+        vatAmount: Number(vatAmount || 0),
+        aitPercent: Number(formData.aitPercent || 0),
+        aitInclude: Boolean(formData.aitInclude),
+        aitAmount: Number(aitAmount || 0),
+        grandTotal: Number(grandTotal || 0),
+        amount: Number(grandTotal || 0),
+        details: {
+          ...formData,
+          categoryId,
+          subCategoryId,
+          subtotal,
+          vatAmount,
+          aitAmount,
+          grandTotal,
+          items: orderItems.map(({ id, ...item }) => item),
+        },
+      };
+      if (formData.customerId) payload.customerId = formData.customerId;
+      if (formData.clientOrderNo) payload.clientOrderNo = formData.clientOrderNo;
+      if (formData.projectTypeId) payload.projectTypeId = formData.projectTypeId;
+      if (formData.siteId) payload.siteId = formData.siteId;
+      if (formData.attachment) payload.attachment = formData.attachment;
+      if (formData.poNo) payload.poNo = formData.poNo;
+      if (categoryId) payload.categoryId = categoryId;
+      if (subCategoryId) payload.subCategoryId = subCategoryId;
+
+      console.log("📤 Sending Work Order Payload:", payload);
+
+      const isEditing = Boolean(editingOrderUuid);
+      const res = await fetch(
+        `${API_BASE}${API_PREFIX}/project-billing/work-orders${
+          isEditing ? `/${editingOrderUuid}` : ""
+        }`,
+        {
+          method: isEditing ? "PATCH" : "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to save work order");
+      }
+
+      alert(`Work Order ${isEditing ? "updated" : "created"} successfully!`);
+      setIsAddOpen(false);
+      resetOrderForm();
+      loadOrders();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Action Handler
+  const handleAction = async (action: string, order: any) => {
+    setOpenActionIndex(null); // Close dropdown immediately
+    console.log(`Action: ${action} triggered for Order: ${order.code}`, order);
+
+    try {
+      switch (action) {
+        case "View":
+          // TODO: API Call for View
+          alert(`Viewing Work Order: ${order.code}`);
+          break;
+        case "Print":
+          // TODO: API Call for Print or trigger print dialog
+          window.print();
+          break;
+        case "Send Mail":
+          // TODO: API Call to send mail
+          alert(`Sending mail for: ${order.code}`);
+          break;
+        case "Edit":
+          setEditingOrderUuid(order.uuid);
+          setFormData({
+            date: order.date || order.recordDate || order.details?.date || new Date().toISOString().slice(0, 10),
+            code: order.code || "",
+            customerId: order.customerId || order.details?.customerId || "",
+            clientOrderNo: order.clientOrderNo || order.details?.clientOrderNo || "",
+            projectTypeId: order.projectTypeId || order.details?.projectTypeId || "",
+            projectId: order.projectId || order.details?.projectId || "",
+            siteId: order.siteId || order.details?.siteId || "",
+            attachment: order.attachment || order.details?.attachment || "",
+            poNo: order.poNo || order.details?.poNo || "",
+            vatPercent: Number(order.vatPercent ?? order.details?.vatPercent ?? 0),
+            vatInclude: Boolean(order.vatInclude ?? order.details?.vatInclude),
+            aitPercent: Number(order.aitPercent ?? order.details?.aitPercent ?? 0),
+            aitInclude: Boolean(order.aitInclude ?? order.details?.aitInclude),
+          });
+          setCategoryId(order.categoryId || order.details?.categoryId || "");
+          setSubCategoryId(order.subCategoryId || order.details?.subCategoryId || "");
+          setOrderItems(
+            (order.items || order.details?.items || []).map((item: any) => ({
+              ...item,
+              id: item.id || String(Date.now() + Math.random()),
+              quantity: Number(item.quantity || 0),
+              rate: Number(item.rate || 0),
+              amount: Number(item.amount ?? Number(item.quantity || 0) * Number(item.rate || 0)),
+            })),
+          );
+          setIsAddOpen(true);
+          break;
+        case "Delete":
+          if (confirm(`Are you sure you want to delete ${order.code}?`)) {
+            setLoading(true);
+            const res = await fetch(
+              `${API_BASE}${API_PREFIX}/project-billing/work-orders/${order.uuid}`,
+              {
+                method: "DELETE",
+                headers: getAuthHeaders(),
+              },
+            );
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({}));
+              throw new Error(errorData.message || "Failed to delete work order");
+            }
+            alert(`Deleted Work Order: ${order.code}`);
+            loadOrders();
+          }
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      console.error("Action failed", error);
+      alert("Action failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== RENDER ====================
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 font-sans text-slate-900">
+      {/* ==================== LIST VIEW ==================== */}
+      {!isAddOpen && (
+        <div className="max-w-[1600px] mx-auto space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+                <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Billing</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                  Work Order List
+                </span>
+              </nav>
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+                Work Order List
+              </h1>
+            </div>
+            <button
+              onClick={openNewOrder}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+New Work Order</span>
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Select Date</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value="1 October, 2026 - 31 October, 2026"
+                    readOnly
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-3.5 pr-9 text-xs sm:text-sm text-slate-700 outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Project</label>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "", label: "All projects" },
+                    ...projects.map((project) => ({
+                      value: project.uuid,
+                      label: project.name,
+                    })),
+                  ]}
+                  value={selectedListProjectId}
+                  onChange={(val) => setSelectedListProjectId(val)}
+                  placeholder="All projects"
+                />
+              </div>
+            </div>
+          </div>
+
+          {dropdownError && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+              {dropdownError}
+            </div>
+          )}
+
+          {loading && (
+            <div className="rounded-2xl border border-slate-200 bg-white py-12 text-center text-slate-500 shadow-sm">
+              <Loader2 className="animate-spin inline w-5 h-5 text-indigo-600 mr-2" />
+              <span className="font-medium text-sm">Loading work orders...</span>
+            </div>
+          )}
+          {error && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs sm:text-sm font-semibold text-rose-700">
+              {error}
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-visible">
+            <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-emerald-700 active:scale-95">
+                  Excel
+                </button>
+                <button className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-rose-700 active:scale-95">
+                  PDF
+                </button>
+              </div>
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto min-h-[350px]">
+              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                    <th className="py-3 px-3 text-center w-12">ID</th>
+                    <th className="py-3 px-3 whitespace-nowrap">CUSTOMER NAME</th>
+                    <th className="py-3 px-3 whitespace-nowrap">WO NO</th>
+                    <th className="py-3 px-3 whitespace-nowrap">REF/INVOICE NO</th>
+                    <th className="py-3 px-3 whitespace-nowrap">DATE</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap">SUB TOTAL</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap">VAT</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap">DISCOUNT</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap">GRAND TOTAL</th>
+                    <th className="py-3 px-3 whitespace-nowrap">ADDED BY</th>
+                    <th className="py-3 px-3 text-center whitespace-nowrap w-24">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {orders
+                    .filter(
+                      (order) =>
+                        !selectedListProjectId ||
+                        order.projectId === selectedListProjectId ||
+                        order.project?.uuid === selectedListProjectId ||
+                        order.details?.projectId === selectedListProjectId,
+                    )
+                    .map((order, index) => (
+                    <tr key={order.uuid || index}>
+                      <td className="py-2 px-3">{index + 1}</td>
+                      <td className="py-2 px-3">
+                        {order.customer?.customerName ||
+                          order.customer?.name ||
+                          customers.find(
+                            (customer) =>
+                              customer.uuid === order.details?.customerId,
+                          )?.name ||
+                          "-"}
+                      </td>
+                      <td className="py-2 px-3">{order.code}</td>
+                      <td className="py-2 px-3">
+                        {order.clientOrderNo || "-"}
+                      </td>
+                      <td className="py-2 px-3">
+                        {order.date ||
+                          order.recordDate ||
+                          order.details?.date ||
+                          "-"}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        {Number(
+                          order.subtotal ?? order.details?.subtotal ?? 0,
+                        ).toFixed(2)}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        {Number(
+                          order.vatAmount ?? order.details?.vatAmount ?? 0,
+                        ).toFixed(2)}
+                      </td>
+                      <td className="py-2 px-3 text-right">0.00</td>
+                      <td className="py-2 px-3 text-right font-semibold">
+                        {Number(
+                          order.grandTotal ??
+                            order.details?.grandTotal ??
+                            order.amount ??
+                            0,
+                        ).toFixed(2)}
+                      </td>
+                      <td className="py-2 px-3">
+                        {order.createdBy || "Admin"}
+                      </td>
+                      <td className="py-2 px-3 text-center relative">
+                        {/* Action Dropdown Wrapper */}
+                        <div
+                          className="relative inline-block text-left"
+                          ref={openActionIndex === index ? actionMenuRef : null}
+                        >
+                          <button
+                            onClick={() =>
+                              setOpenActionIndex(
+                                openActionIndex === index ? null : index,
+                              )
+                            }
+                            className="bg-indigo-600 text-white text-[11px] px-3 py-1.5 rounded inline-flex items-center gap-1 hover:bg-indigo-700 transition-colors"
+                          >
+                            Action <ChevronDown className="w-3 h-3" />
+                          </button>
+
+                          {/* Dropdown Menu */}
+                          {openActionIndex === index && (
+                            <div className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden text-left">
+                              <button
+                                onClick={() => handleAction("View", order)}
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-indigo-600" />{" "}
+                                View
+                              </button>
+                              <button
+                                onClick={() => handleAction("Print", order)}
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <Printer className="w-3.5 h-3.5 text-indigo-600" />{" "}
+                                Print
+                              </button>
+                              <button
+                                onClick={() => handleAction("Send Mail", order)}
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              >
+                                <Mail className="w-3.5 h-3.5 text-indigo-600" />{" "}
+                                Send Mail
+                              </button>
+                              <button
+                                onClick={() => handleAction("Edit", order)}
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-cyan-600 hover:bg-cyan-50 flex items-center gap-2"
+                              >
+                                <Pencil className="w-3.5 h-3.5" /> Edit
+                              </button>
+                              <div className="border-t border-slate-100"></div>
+                              <button
+                                onClick={() => handleAction("Delete", order)}
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    ))}
+                  {orders.length === 0 && !loading && (
+                    <tr>
+                      <td
+                        colSpan={11}
+                        className="text-center py-10 text-slate-400"
+                      >
+                        No data available in table
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== ADD VIEW ==================== */}
+      {isAddOpen && (
+        <div className="max-w-[1600px] mx-auto bg-white border border-slate-200 rounded-xl shadow-lg p-6 space-y-6">
+          <div className="flex justify-between items-center border-b pb-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setIsAddOpen(false);
+                  resetOrderForm();
+                }}
+                className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"
+              >
+                <ArrowLeft className="w-5 h-5 text-slate-700" />
+              </button>
+              <h2 className="text-lg font-bold text-slate-800">
+                {editingOrderUuid ? "Work Order Edit" : "Work Order Add"}
+              </h2>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsItemModalOpen(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-semibold"
+              >
+                Add Item
+              </button>
+              <button
+                onClick={() => setIsCustomerModalOpen(true)}
+                className="bg-cyan-500 text-white px-4 py-2 rounded-lg text-xs font-semibold"
+              >
+                Add Client
+              </button>
+              <button
+                onClick={() => {
+                  setIsAddOpen(false);
+                  resetOrderForm();
+                }}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-semibold"
+              >
+                Work Order List
+              </button>
+            </div>
+          </div>
+
+          {/* Form Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Date
+              </label>
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(e) =>
+                  setFormData({ ...formData, date: e.target.value })
+                }
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Customer
+              </label>
+              <PredictiveSearchSelect
+                options={customers.map((c) => ({
+                  value: c.uuid,
+                  label: c.name,
+                }))}
+                value={formData.customerId}
+                onChange={(val) =>
+                  setFormData({ ...formData, customerId: val })
+                }
+                placeholder="Select One Option"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Code
+              </label>
+              <input
+                type="text"
+                value={formData.code}
+                readOnly
+                className="w-full border rounded-lg px-3 py-2 bg-slate-50"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Project Type
+              </label>
+              <PredictiveSearchSelect
+                options={projectTypes.map((t) => ({
+                  value: t.uuid,
+                  label: t.name,
+                }))}
+                value={formData.projectTypeId}
+                onChange={(val) =>
+                  setFormData({ ...formData, projectTypeId: val })
+                }
+                placeholder="Select value"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Project
+              </label>
+              <PredictiveSearchSelect
+                options={projects.map((p) => ({
+                  value: p.uuid,
+                  label: p.name,
+                }))}
+                value={formData.projectId}
+                onChange={(val) =>
+                  setFormData({ ...formData, projectId: val })
+                }
+                placeholder="Select Project"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Site
+              </label>
+              <PredictiveSearchSelect
+                options={sites
+                  .filter(
+                    (site) =>
+                      !site.projectId ||
+                      site.projectId === formData.projectId,
+                  )
+                  .map((site) => ({
+                    value: site.uuid,
+                    label: site.name,
+                  }))}
+                value={formData.siteId}
+                onChange={(val) =>
+                  setFormData({ ...formData, siteId: val })
+                }
+                placeholder="Select Site"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Client Order No.
+              </label>
+              <input
+                type="text"
+                value={formData.clientOrderNo}
+                onChange={(e) =>
+                  setFormData({ ...formData, clientOrderNo: e.target.value })
+                }
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                PO No.
+              </label>
+              <input
+                type="text"
+                value={formData.poNo}
+                onChange={(e) =>
+                  setFormData({ ...formData, poNo: e.target.value })
+                }
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Attachment
+              </label>
+              <input
+                type="file"
+                className="w-full border rounded-lg px-3 py-1.5 text-slate-500"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () =>
+                      setFormData({
+                        ...formData,
+                        attachment: String(reader.result),
+                      });
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Item Selection Bar */}
+          <div className="bg-slate-100 p-3 rounded-xl grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Category
+              </label>
+              <PredictiveSearchSelect
+                options={categories.map((c) => ({
+                  value: c.uuid,
+                  label: c.name,
+                }))}
+                value={categoryId}
+                onChange={(val) => {
+                  setCategoryId(val);
+                  setSubCategoryId("");
+                }}
+                placeholder="Select Category"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Sub Category
+              </label>
+              <PredictiveSearchSelect
+                options={subCategories
+                  .filter(
+                    (sc) =>
+                      !categoryId ||
+                      sc.categoryId === categoryId ||
+                      sc.details?.categoryId === categoryId,
+                  )
+                  .map((sc) => ({
+                    value: sc.uuid,
+                    label: sc.name,
+                  }))}
+                value={subCategoryId}
+                onChange={(val) => setSubCategoryId(val)}
+                placeholder="Select Sub Category"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Select Item (Product / Material)
+              </label>
+              <PredictiveSearchSelect
+                options={items
+                  .filter(
+                    (item) =>
+                      (!item.projectId ||
+                        item.projectId === formData.projectId) &&
+                      (!categoryId ||
+                        !item.details?.categoryId ||
+                        item.details.categoryId === categoryId) &&
+                      (!subCategoryId ||
+                        !item.details?.subCategoryId ||
+                        item.details.subCategoryId === subCategoryId),
+                  )
+                  .map((i) => ({
+                    value: i.uuid,
+                    label: i.name,
+                  }))}
+                value=""
+                onChange={(val) => {
+                  const selected = items.find((item) => item.uuid === val);
+                  if (selected)
+                    setOrderItems([
+                      ...orderItems,
+                      {
+                        id: String(Date.now()),
+                        itemId: selected.uuid,
+                        itemName: selected.name,
+                        description: selected.description || "",
+                        unit: selected.unit || "Nos",
+                        quantity: 1,
+                        rate: Number(
+                          selected.rate || selected.salePrice || 0,
+                        ),
+                        amount: Number(
+                          selected.rate || selected.salePrice || 0,
+                        ),
+                      },
+                    ]);
+                }}
+                placeholder="Search Item / Product / Material..."
+              />
+            </div>
+          </div>
+
+          {/* Work Order Items Table */}
+          <div className="overflow-x-auto border rounded-xl">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-indigo-600 text-white">
+                <tr>
+                  <th className="py-3 px-3">Item Name</th>
+                  <th className="py-3 px-3">Description</th>
+                  <th className="py-3 px-3">Unit</th>
+                  <th className="py-3 px-3">Quantity</th>
+                  <th className="py-3 px-3">Rate</th>
+                  <th className="py-3 px-3">Image</th>
+                  <th className="py-3 px-3 text-right">Amount</th>
+                  <th className="py-3 px-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {orderItems.map((item, index) => (
+                  <tr key={item.id}>
+                    <td className="py-2 px-3">
+                      <input
+                        type="text"
+                        value={item.itemName}
+                        onChange={(e) =>
+                          setOrderItems(
+                            orderItems.map((row, i) =>
+                              i === index
+                                ? { ...row, itemName: e.target.value }
+                                : row,
+                            ),
+                          )
+                        }
+                        className="w-full border rounded px-2 py-1"
+                        placeholder="Name"
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) =>
+                          setOrderItems(
+                            orderItems.map((row, i) =>
+                              i === index
+                                ? { ...row, description: e.target.value }
+                                : row,
+                            ),
+                          )
+                        }
+                        className="w-full border rounded px-2 py-1"
+                      />
+                    </td>
+                    <td className="py-2 px-3 w-32">
+                      <PredictiveSearchSelect
+                        options={[
+                          { value: "Nos", label: "Nos" },
+                          { value: "Pcs", label: "Pcs" },
+                          { value: "Kg", label: "Kg" },
+                          { value: "Set", label: "Set" },
+                          { value: "Job", label: "Job" },
+                        ]}
+                        value={item.unit}
+                        onChange={(val) =>
+                          setOrderItems(
+                            orderItems.map((row, i) =>
+                              i === index ? { ...row, unit: val } : row,
+                            ),
+                          )
+                        }
+                        placeholder="Unit"
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const quantity = Number(e.target.value);
+                          setOrderItems(
+                            orderItems.map((row, i) =>
+                              i === index
+                                ? {
+                                    ...row,
+                                    quantity,
+                                    amount: quantity * row.rate,
+                                  }
+                                : row,
+                            ),
+                          );
+                        }}
+                        className="w-full border rounded px-2 py-1"
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        type="number"
+                        value={item.rate}
+                        onChange={(e) => {
+                          const rate = Number(e.target.value);
+                          setOrderItems(
+                            orderItems.map((row, i) =>
+                              i === index
+                                ? { ...row, rate, amount: row.quantity * rate }
+                                : row,
+                            ),
+                          );
+                        }}
+                        className="w-full border rounded px-2 py-1"
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        type="file"
+                        className="w-full text-slate-500"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () =>
+                              setOrderItems(
+                                orderItems.map((row, i) =>
+                                  i === index
+                                    ? { ...row, image: String(reader.result) }
+                                    : row,
+                                ),
+                              );
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </td>
+                    <td className="py-2 px-3 text-right font-semibold">
+                      {Number(item.amount || 0).toFixed(2)}
+                    </td>
+                    <td className="py-2 px-3 text-center">
+                      <button
+                        onClick={() =>
+                          setOrderItems(
+                            orderItems.filter((_, i) => i !== index),
+                          )
+                        }
+                        className="text-rose-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {orderItems.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="text-center py-6 text-slate-400">
+                      No items added yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Totals & Payment */}
+          <div className="flex justify-end mt-4">
+            <div className="w-full md:w-1/2 space-y-2 text-xs">
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded border">
+                <span className="font-semibold text-slate-700">Subtotal:</span>
+                <span className="w-32 bg-white border rounded px-2 py-1 text-right">
+                  {subtotal.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded border">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700">Vat(%):</span>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.vatInclude}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          vatInclude: e.target.checked,
+                        })
+                      }
+                    />{" "}
+                    If Include
+                  </label>
+                </div>
+                <input
+                  type="number"
+                  value={formData.vatPercent}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      vatPercent: Number(e.target.value),
+                    })
+                  }
+                  className="w-32 bg-white border rounded px-2 py-1"
+                />
+              </div>
+
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded border">
+                <span className="font-semibold text-slate-700">
+                  Vat(Amount):
+                </span>
+                <span className="w-32 bg-slate-100 border rounded px-2 py-1 text-right">
+                  {vatAmount.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded border">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700">AIT(%):</span>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.aitInclude}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          aitInclude: e.target.checked,
+                        })
+                      }
+                    />{" "}
+                    If Include
+                  </label>
+                </div>
+                <input
+                  type="number"
+                  value={formData.aitPercent}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      aitPercent: Number(e.target.value),
+                    })
+                  }
+                  className="w-32 bg-white border rounded px-2 py-1"
+                />
+              </div>
+
+              <div className="flex justify-between items-center bg-slate-50 p-2 rounded border">
+                <span className="font-semibold text-slate-700">
+                  AIT(Amount):
+                </span>
+                <span className="w-32 bg-slate-100 border rounded px-2 py-1 text-right">
+                  {aitAmount.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center bg-emerald-600 p-2 rounded border border-emerald-700 text-white font-bold">
+                <span>Grand Total:</span>
+                <span className="w-32 text-right">{grandTotal.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <button
+              onClick={handleSaveOrder}
+              disabled={loading}
+              className="px-8 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shadow-sm flex items-center gap-2"
+            >
+              {loading ? (
+                <Loader2 className="animate-spin w-4 h-4" />
+              ) : (
+                editingOrderUuid ? "Update" : "Submit"
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: NEW ITEM ==================== */}
+      {isItemModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="flex justify-between items-center bg-slate-50 px-5 py-3 border-b">
+              <h3 className="font-bold text-slate-800">New Item</h3>
+              <button
+                onClick={() => setIsItemModalOpen(false)}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="block font-semibold mb-1">Category</label>
+                <PredictiveSearchSelect
+                  options={categories.map((c) => ({
+                    value: c.uuid,
+                    label: c.name,
+                  }))}
+                  value=""
+                  onChange={() => {}}
+                  placeholder="Select Category"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Sub Category</label>
+                <PredictiveSearchSelect
+                  options={subCategories.map((sc) => ({
+                    value: sc.uuid,
+                    label: sc.name,
+                  }))}
+                  value=""
+                  onChange={() => {}}
+                  placeholder="Select Sub Category"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block font-semibold mb-1">Item Name</label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Brand</label>
+                <PredictiveSearchSelect
+                  options={[]}
+                  value=""
+                  onChange={() => {}}
+                  placeholder="Select Brand"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Unit</label>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Nos", label: "Nos" },
+                    { value: "Pcs", label: "Pcs" },
+                    { value: "Kg", label: "Kg" },
+                  ]}
+                  value="Nos"
+                  onChange={() => {}}
+                  placeholder="Select Unit"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">
+                  Purchase Price
+                </label>
+                <input
+                  type="number"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Sale Price</label>
+                <input
+                  type="number"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+            </div>
+            <div className="bg-slate-50 px-5 py-3 border-t flex justify-end gap-2">
+              <button
+                onClick={() => setIsItemModalOpen(false)}
+                className="px-4 py-2 border rounded-lg text-xs font-semibold"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleAddItemToTable}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: CUSTOMER ADD ==================== */}
+      {isCustomerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
+            <div className="flex justify-between items-center bg-slate-50 px-5 py-3 border-b">
+              <h3 className="font-bold text-slate-800">Customer Add</h3>
+              <button
+                onClick={() => setIsCustomerModalOpen(false)}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="block font-semibold mb-1">Code</label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-2 py-1.5 bg-slate-50"
+                  readOnly
+                  value={`CUS${Math.floor(100000 + Math.random() * 900000)}`}
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Name</label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">
+                  Mobile Number
+                </label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">
+                  Buyer Reference
+                </label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block font-semibold mb-1">Address</label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Credit Limit</label>
+                <input
+                  type="number"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Due Date</label>
+                <input
+                  type="date"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">
+                  Opening Balance
+                </label>
+                <input
+                  type="number"
+                  className="w-full border rounded px-2 py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">
+                  Chart Of Groups
+                </label>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Customers", label: "Customers" },
+                    { value: "Sundry Debtors", label: "Sundry Debtors" },
+                  ]}
+                  value=""
+                  onChange={() => {}}
+                  placeholder="Select One Option"
+                />
+              </div>
+            </div>
+            <div className="bg-slate-50 px-5 py-3 border-t flex justify-end gap-2">
+              <button
+                onClick={() => setIsCustomerModalOpen(false)}
+                className="px-4 py-2 border rounded-lg text-xs font-semibold"
+              >
+                Close
+              </button>
+              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold">
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
