@@ -31,6 +31,7 @@ import {
 import { useLang, type Bi } from "@/lib/i18n";
 import { LangSwitch } from "@/components/site/LangSwitch";
 import { Logo } from "@/components/site/Logo";
+import { Navbar } from "@/components/site/Navbar";
 
 const API_BASE = (
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_BASE_URL
@@ -294,15 +295,30 @@ export default function RegisterPage() {
     "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 sm:p-6 lg:p-8">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-slate-50 px-4 pt-28 pb-14 text-slate-800 antialiased">
+      <Navbar />
+
+      {/* ambient background */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px] opacity-75" />
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="grid w-full max-w-6xl overflow-hidden rounded-[32px] bg-slate-900 shadow-2xl ring-1 ring-white/10 lg:grid-cols-12"
+        animate={{ x: [0, 40, 0], y: [0, 20, 0] }}
+        transition={{ duration: 16, repeat: Infinity }}
+        className="pointer-events-none absolute -left-32 top-10 h-[28rem] w-[28rem] rounded-full bg-emerald-100/60 blur-[100px]"
+      />
+      <motion.div
+        animate={{ x: [0, -30, 0], y: [0, 30, 0] }}
+        transition={{ duration: 20, repeat: Infinity }}
+        className="pointer-events-none absolute -right-32 bottom-10 h-[28rem] w-[28rem] rounded-full bg-teal-100/50 blur-[100px]"
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-6xl overflow-hidden rounded-[32px] border border-slate-200/90 bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.08)] lg:grid lg:grid-cols-12"
       >
         {/* LEFT — photo carousel (5 cols) */}
-        <div className="relative hidden min-h-[640px] flex-col justify-between overflow-hidden bg-slate-950 p-10 lg:flex lg:col-span-5">
+        <div className="relative hidden min-h-[700px] flex-col justify-between overflow-hidden bg-slate-900 p-10 lg:flex lg:col-span-5">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentSlide}
@@ -353,11 +369,7 @@ export default function RegisterPage() {
 
         {/* RIGHT — registration form (7 cols) */}
         <div className="relative flex flex-col justify-center bg-white p-6 sm:p-10 lg:col-span-7 max-h-[92vh] overflow-y-auto">
-          <div className="absolute right-6 top-6 sm:right-8 sm:top-8 z-10">
-            <LangSwitch id="register-lang" tone="light" />
-          </div>
-
-          <div className="mx-auto w-full max-w-xl pt-6 lg:pt-0">
+          <div className="mx-auto w-full max-w-xl">
             <div className="lg:hidden mb-4">
               <Logo tone="dark" />
             </div>
