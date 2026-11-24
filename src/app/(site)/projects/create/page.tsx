@@ -8,25 +8,18 @@ import {
   ImagePlus,
   Upload,
   ShieldCheck,
-  Info,
   FileText,
   CheckCircle2,
   Lock,
   LogIn,
   UserPlus,
-  User,
-  Users,
-  Building2,
-  Briefcase,
-  Sparkles,
   Check,
-  MapPin,
-  FileBadge,
-  Globe,
-  Hash,
+  Building2,
+  Users,
+  User,
+  Sparkles,
   FileCheck,
-  ScrollText,
-  BadgeCheck,
+  Briefcase,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useLang } from "@/lib/i18n";
@@ -41,8 +34,6 @@ import {
   getStoredAccessToken,
   getStoredUser,
 } from "@/lib/admin-auth/adminAuthStorage";
-
-type UserType = "individual" | "community" | "organisation";
 
 interface UploadedFileItem {
   url: string;
@@ -62,10 +53,7 @@ export default function CreatePublicProjectPage() {
   const [submitted, setSubmitted] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // User / Role Type
-  const [userType, setUserType] = useState<UserType>("individual");
-
-  // Project Form State
+  // Project Form State (Purely Project Specific - User/Creator data comes from registration profile)
   const [form, setForm] = useState({
     name: "",
     categoryId: 0,
@@ -78,25 +66,9 @@ export default function CreatePublicProjectPage() {
     expectedAnnualReturn: 0,
     startDate: "",
     endDate: "",
-    // Creator / Contact details
-    creatorName: "",
-    creatorEmail: "",
-    creatorPhone: "",
-    companyName: "",
-    // Role specific dynamic fields
-    nidNumber: "",
-    profession: "",
-    designation: "",
-    memberCount: 0,
-    communityRegNo: "",
-    businessType: "Private Limited Company",
-    tradeLicenseNo: "",
-    tinBinNo: "",
-    websiteUrl: "",
-    officeAddress: "",
   });
 
-  // Role-specific Upload Cards State
+  // Project Documents & Media State
   const [slotFiles, setSlotFiles] = useState<Record<string, UploadedFileItem[]>>({});
 
   useEffect(() => {
@@ -110,15 +82,6 @@ export default function CreatePublicProjectPage() {
       setShowLoginModal(false);
       const user = getStoredUser();
       setCurrentUser(user);
-      if (user) {
-        const u = user as Record<string, any>;
-        setForm((prev) => ({
-          ...prev,
-          creatorName: prev.creatorName || String(u.name || ""),
-          creatorEmail: prev.creatorEmail || String(u.email || ""),
-          creatorPhone: String(prev.creatorPhone || u.phone || u.mobileNo || ""),
-        }));
-      }
     }
 
     void getPublicCategories()
@@ -161,7 +124,7 @@ export default function CreatePublicProjectPage() {
     );
   }, [currentUser]);
 
-  // Handler for uploading files into specific role-based card slots
+  // Handler for uploading files into specific card slots
   const handleSlotFiles = (
     slotKey: string,
     slotTitle: string,
@@ -232,7 +195,7 @@ export default function CreatePublicProjectPage() {
       return;
     }
 
-    // 1. General Project Details
+    // 1. General Project Details Validation
     if (!form.name || !form.categoryId || !form.description || !form.location) {
       toast.error(
         t({
@@ -243,72 +206,7 @@ export default function CreatePublicProjectPage() {
       return;
     }
 
-    // 2. Role-Specific Profile Validation
-    if (userType === "individual") {
-      if (!form.creatorName) {
-        toast.error(t({ bn: "উদ্যোক্তার পূর্ণ নাম প্রদান করুন", en: "Please enter creator's full name" }));
-        return;
-      }
-      if (!form.nidNumber) {
-        toast.error(t({ bn: "জাতীয় পরিচয়পত্র (NID) নম্বর আবশ্যক", en: "National ID (NID) number is required" }));
-        return;
-      }
-      if (!form.creatorEmail || !form.creatorPhone) {
-        toast.error(t({ bn: "ইমেইল ও মোবাইল নম্বর আবশ্যক", en: "Email and phone number are required" }));
-        return;
-      }
-    } else if (userType === "community") {
-      if (!form.companyName) {
-        toast.error(t({ bn: "কমিউনিটি বা সমিতির নাম আবশ্যক", en: "Community / Association name is required" }));
-        return;
-      }
-      if (!form.creatorName || !form.designation) {
-        toast.error(
-          t({
-            bn: "প্রধান প্রতিনিধির নাম এবং পদবি উল্লেখ করুন",
-            en: "Lead representative name and designation are required",
-          })
-        );
-        return;
-      }
-      if (!form.creatorEmail || !form.creatorPhone) {
-        toast.error(t({ bn: "যোগাযোগের ইমেইল ও মোবাইল নম্বর দিন", en: "Contact email and phone are required" }));
-        return;
-      }
-      if (!form.memberCount || form.memberCount <= 0) {
-        toast.error(t({ bn: "কমিউনিটির মোট সদস্য সংখ্যা উল্লেখ করুন", en: "Total community members count is required" }));
-        return;
-      }
-    } else if (userType === "organisation") {
-      if (!form.companyName) {
-        toast.error(t({ bn: "কোম্পানি বা প্রতিষ্ঠানের নিবন্ধিত নাম আবশ্যক", en: "Registered Company Name is required" }));
-        return;
-      }
-      if (!form.tradeLicenseNo) {
-        toast.error(
-          t({
-            bn: "ট্রেড লাইসেন্স বা আরজেএসসি ইনকর্পোরেশন নম্বর দিন",
-            en: "Trade License / RJSC Incorporation number is required",
-          })
-        );
-        return;
-      }
-      if (!form.creatorName || !form.designation) {
-        toast.error(
-          t({
-            bn: "অনুমোদিত পরিচালক বা প্রতিনিধির নাম ও পদবি দিন",
-            en: "Authorized signatory name and designation are required",
-          })
-        );
-        return;
-      }
-      if (!form.creatorEmail || !form.creatorPhone) {
-        toast.error(t({ bn: "কর্পোরেট ইমেইল ও মোবাইল নম্বর দিন", en: "Official corporate email and phone are required" }));
-        return;
-      }
-    }
-
-    // 3. Investment Structure Validation
+    // 2. Investment Structure Validation
     if (form.totalShares <= 0 || form.pricePerShare <= 0 || form.totalInvestmentAmount <= 0) {
       toast.error(
         t({
@@ -328,7 +226,7 @@ export default function CreatePublicProjectPage() {
       return;
     }
 
-    // 4. Section 4 Role-based Card Documents Validation:
+    // 3. Project Media Validation
     const projectImages = slotFiles["projectImages"] || [];
     if (projectImages.length === 0) {
       toast.error(
@@ -338,57 +236,6 @@ export default function CreatePublicProjectPage() {
         })
       );
       return;
-    }
-
-    if (userType === "individual") {
-      // Individual: only 1 card required (projectImages). Necessary PDF document card is optional.
-    } else if (userType === "community") {
-      if (!slotFiles["resolutionDoc"] || slotFiles["resolutionDoc"].length === 0) {
-        toast.error(
-          t({
-            bn: "সমিতির রেজোলিউশন বা যৌথ সভার কার্যবিবরণী কপি আপলোড করা আবশ্যক",
-            en: "Community resolution / minutes copy upload is required",
-          })
-        );
-        return;
-      }
-      if (!slotFiles["memberListDoc"] || slotFiles["memberListDoc"].length === 0) {
-        toast.error(
-          t({
-            bn: "সদস্য তালিকা ও স্বাক্ষর শিট আপলোড করা আবশ্যক",
-            en: "Member list and signatures upload is required",
-          })
-        );
-        return;
-      }
-    } else if (userType === "organisation") {
-      if (!slotFiles["tradeLicenseDoc"] || slotFiles["tradeLicenseDoc"].length === 0) {
-        toast.error(
-          t({
-            bn: "হালনাগাদ ট্রেড লাইসেন্স কপি আপলোড করা আবশ্যক",
-            en: "Trade License copy upload is required",
-          })
-        );
-        return;
-      }
-      if (!slotFiles["incorpDoc"] || slotFiles["incorpDoc"].length === 0) {
-        toast.error(
-          t({
-            bn: "ইনকর্পোরেশন সার্টিফিকেট বা আরজেএসসি নিবন্ধন কপি আপলোড আবশ্যক",
-            en: "Incorporation certificate / RJSC registration is required",
-          })
-        );
-        return;
-      }
-      if (!slotFiles["tinDoc"] || slotFiles["tinDoc"].length === 0) {
-        toast.error(
-          t({
-            bn: "কোম্পানির ই-টিন বা ট্যাক্স রিটার্ন সার্টিফিকেট আপলোড আবশ্যক",
-            en: "TIN / Tax return certificate upload is required",
-          })
-        );
-        return;
-      }
     }
 
     // Bundle all document slots into documents payload
@@ -401,16 +248,34 @@ export default function CreatePublicProjectPage() {
 
     setSaving(true);
     try {
+      const u = (currentUser as Record<string, any>) || {};
+      const p = (u.profile as Record<string, any>) || {};
+
       await createPublicShareProject({
         ...form,
-        userType,
+        // Auto-supplied from logged-in user profile saved during registration
+        creatorName: u.name || "Seller",
+        creatorEmail: u.email || "seller@realbiz.com",
+        creatorPhone: u.phone || u.mobileNo || p.phone || "01700000000",
+        companyName: p.companyName || p.communityName || "",
+        userType: p.entityType || u.userType || "individual",
+        nidNumber: p.nidNumber || "",
+        profession: p.profession || "",
+        designation: p.designation || p.signatoryDesignation || p.communityDesignation || "",
+        memberCount: Number(p.memberCount || 0),
+        communityRegNo: p.communityRegNo || "",
+        businessType: p.businessType || "Private Limited Company",
+        tradeLicenseNo: p.tradeLicense || p.tradeLicenseNo || "",
+        websiteUrl: p.website || "",
+        officeAddress: p.officeAddress || p.presentAddress || p.communityAddress || "",
         images: projectImages.map((i) => ({ url: i.url, title: i.title })),
         documents: allDocs,
       });
+
       setSubmitted(true);
       toast.success(
         t({
-          bn: "প্রজেক্ট সাবমিট হয়েছে ও অনুমোদনের অপেক্ষায় রয়েছে",
+          bn: "প্রজেক্ট সাবমিট হয়েছে ও পর্যালোচনার জন্য জমা হয়েছে",
           en: "Project submitted and is pending Admin review",
         })
       );
@@ -427,7 +292,7 @@ export default function CreatePublicProjectPage() {
     "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20";
   const labelStyle = "block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide";
 
-  // Reusable Role-Specific Upload Card Component
+  // Reusable Document / Media Upload Card Component
   const renderUploadCard = (
     slotKey: string,
     title: string,
@@ -547,7 +412,6 @@ export default function CreatePublicProjectPage() {
                 type="button"
                 onClick={() => {
                   setSubmitted(false);
-                  setUserType("individual");
                   setForm({
                     name: "",
                     categoryId: 0,
@@ -560,20 +424,6 @@ export default function CreatePublicProjectPage() {
                     expectedAnnualReturn: 0,
                     startDate: "",
                     endDate: "",
-                    creatorName: "",
-                    creatorEmail: "",
-                    creatorPhone: "",
-                    companyName: "",
-                    nidNumber: "",
-                    profession: "",
-                    designation: "",
-                    memberCount: 0,
-                    communityRegNo: "",
-                    businessType: "Private Limited Company",
-                    tradeLicenseNo: "",
-                    tinBinNo: "",
-                    websiteUrl: "",
-                    officeAddress: "",
                   });
                   setSlotFiles({});
                 }}
@@ -626,6 +476,10 @@ export default function CreatePublicProjectPage() {
     );
   }
 
+  const userProfile = currentUser?.profile || {};
+  const userRole = String(currentUser?.role || currentUser?.userType || "Seller");
+  const entityType = String(userProfile.entityType || currentUser?.userType || "individual");
+
   return (
     <main className="bg-slate-50 pb-20 pt-28">
       <div className="mx-auto max-w-5xl px-5 sm:px-8">
@@ -648,47 +502,44 @@ export default function CreatePublicProjectPage() {
             </h1>
             <p className="mt-2 text-sm text-slate-500">
               {t({
-                bn: "প্রজেক্টের তথ্য, বিনিয়োগ পরিকল্পনা এবং ক্রিয়েটার পরিচিতি প্রদান করুন। অ্যাডমিন যাচাই-বাছাইয়ের পর অনুমোদন প্রদান করবেন।",
-                en: "Provide project details, investment structure, and creator details. Admin will verify and publish.",
+                bn: "প্রজেক্টের তথ্য, বিনিয়োগ পরিকল্পনা এবং প্রয়োজনীয় নথিপত্র প্রদান করুন। উদ্যোক্তার প্রোফাইল তথ্য আপনার রেজিস্ট্রেশন অ্যাকাউন্ট থেকে স্বয়ংক্রিয়ভাবে যুক্ত হবে।",
+                en: "Provide project specifications, investment structure, and documents. Creator profile is automatically linked from your registered account.",
               })}
             </p>
           </div>
 
-          {/* ══════════════ USER / ENTITY TYPE SELECTOR (DROPDOWN ONLY) ══════════════ */}
-          <div className="mb-10 rounded-2xl border border-slate-200 bg-slate-50/70 p-5 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="max-w-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-700">
-                    <Sparkles className="h-3.5 w-3.5" />
-                  </span>
-                  <label htmlFor="userTypeSelect" className="text-sm font-bold text-slate-900">
-                    {t({ bn: "উদ্যোক্তা বা ইউজারের ধরন (Select User Role)", en: "User / Creator Role" })}{" "}
-                    <span className="text-rose-500">*</span>
-                  </label>
+          {/* ══════════════ REGISTERED USER PROFILE BADGE ══════════════ */}
+          {currentUser && (
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  {entityType === "organisation" ? (
+                    <Building2 className="h-5 w-5" />
+                  ) : entityType === "community" ? (
+                    <Users className="h-5 w-5" />
+                  ) : (
+                    <User className="h-5 w-5" />
+                  )}
                 </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  {t({
-                    bn: "আপনি কোন ধরনের ইউজার হিসেবে প্রজেক্টটি জমা দিচ্ছেন নির্বাচন করুন (Individual, Community বা Organisation)। রোল অনুযায়ী নিচের তথ্য ও ডকুমেন্টস কার্ড পরিবর্তিত হবে।",
-                    en: "Select whether you are submitting as an Individual, Community or Organisation. Required fields and document cards will adapt accordingly.",
-                  })}
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900">
+                      {currentUser.name || t({ bn: "রেজিস্টার্ড উদ্যোক্তা", en: "Registered Creator" })}
+                    </span>
+                    <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 capitalize">
+                      {entityType}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {currentUser.email} {currentUser.phone ? `• ${currentUser.phone}` : ""}
+                  </p>
+                </div>
               </div>
-
-              <div className="w-full sm:w-72 shrink-0">
-                <select
-                  id="userTypeSelect"
-                  value={userType}
-                  onChange={(e) => setUserType(e.target.value as UserType)}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-900 shadow-xs outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
-                >
-                  <option value="individual">{t({ bn: "👤 Individual (ব্যক্তিগত উদ্যোগ)", en: "👤 Individual Creator" })}</option>
-                  <option value="community">{t({ bn: "👥 Community (কমিউনিটি বা সমবায়)", en: "👥 Community / Group" })}</option>
-                  <option value="organisation">{t({ bn: "🏢 Organisation (প্রতিষ্ঠান বা কোম্পানি)", en: "🏢 Organisation / Company" })}</option>
-                </select>
+              <div className="text-xs text-emerald-700 font-semibold bg-white/80 border border-emerald-200/80 rounded-xl px-3 py-1.5 w-fit">
+                ✓ {t({ bn: "রেজিস্ট্রেশনের প্রোফাইল সংযুক্ত", en: "Profile details linked from registration" })}
               </div>
             </div>
-          </div>
+          )}
 
           {/* ══════════════ SECTION 1: BASIC INFORMATION ══════════════ */}
           <div className="mb-10">
@@ -751,22 +602,15 @@ export default function CreatePublicProjectPage() {
                   onChange={(e) => setForm({ ...form, location: e.target.value })}
                   className={inputStyle}
                 >
-                  <option value="">
-                    {loadingLocations
-                      ? t({ bn: "লোকেশন এপিআই থেকে জেলা লোড হচ্ছে...", en: "Loading districts from API..." })
-                      : t({
-                          bn: "-- জেলা ও বিভাগ নির্বাচন করুন (Select District) --",
-                          en: "-- Select District & Division --",
-                        })}
-                  </option>
-                  {divisions.map((div) => (
-                    <optgroup
-                      key={div.id}
-                      label={`${div.name} Division (${div.bnName} বিভাগ) — ${div.districts.length}টি জেলা`}
-                    >
-                      {div.districts.map((dis) => (
-                        <option key={dis.id} value={dis.name}>
-                          {dis.name} — {dis.bnName} ({div.name} / {div.bnName} বিভাগ)
+                  <option value="">{t({ bn: "-- জেলা নির্বাচন করুন --", en: "-- Select District --" })}</option>
+                  {divisions.map((division) => (
+                    <optgroup key={division.id} label={`${division.name} Division (${division.bnName})`}>
+                      {division.districts.map((district) => (
+                        <option
+                          key={district.id}
+                          value={`${district.name}, ${division.name}`}
+                        >
+                          {district.name} ({district.bnName})
                         </option>
                       ))}
                     </optgroup>
@@ -774,35 +618,10 @@ export default function CreatePublicProjectPage() {
                 </select>
               </div>
 
-              {/* Conditional Entity / Venture / Brand Name */}
-              <div>
-                <label className={labelStyle}>
-                  {userType === "individual"
-                    ? t({ bn: "উদ্যোগের নাম বা ব্র্যান্ড (ঐচ্ছিক)", en: "Venture / Brand Name (Optional)" })
-                    : userType === "community"
-                    ? t({ bn: "কমিউনিটি বা সমিতির নাম (Community Name) *", en: "Community / Group Name *" })
-                    : t({ bn: "কোম্পানি বা প্রতিষ্ঠানের নিবন্ধিত নাম *", en: "Registered Company Name *" })}
-                </label>
-                <input
-                  type="text"
-                  required={userType !== "individual"}
-                  placeholder={
-                    userType === "individual"
-                      ? t({ bn: "যেমন: গ্রিন এগ্রো এন্টারপ্রাইজ", en: "e.g., Green Agro Enterprise" })
-                      : userType === "community"
-                      ? t({ bn: "যেমন: উত্তরা যুব সমবায় সমিতি", en: "e.g., Uttara Youth Cooperative" })
-                      : t({ bn: "যেমন: স্কাইলাইন ডেভেলপার্স লিঃ", en: "e.g., Skyline Developers Ltd." })
-                  }
-                  value={form.companyName}
-                  onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                  className={inputStyle}
-                />
-              </div>
-
               {/* Field: Description */}
-              <div className="md:col-span-2">
+              <div className="md:col-span-3">
                 <label className={labelStyle}>
-                  {t({ bn: "প্রজেক্টের পূর্ণ বিবরণ (Project Description)", en: "Project Description" })}{" "}
+                  {t({ bn: "প্রজেক্টের বিস্তারিত বিবরণ (Overview & Description)", en: "Project Overview & Details" })}{" "}
                   <span className="text-rose-500">*</span>
                 </label>
                 <textarea
@@ -820,434 +639,11 @@ export default function CreatePublicProjectPage() {
             </div>
           </div>
 
-          {/* ══════════════ SECTION 2: DYNAMIC CREATOR / ENTITY DETAILS ══════════════ */}
-          <div className="mb-10 border-t border-slate-100 pt-8">
-            <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
-                  2
-                </span>
-                {userType === "individual"
-                  ? t({ bn: "উদ্যোক্তার ব্যক্তিগত পরিচিতি (Creator Profile)", en: "Individual Creator Details" })
-                  : userType === "community"
-                  ? t({ bn: "কমিউনিটি ও প্রতিনিধির তথ্য (Community & Representative)", en: "Community & Representative Details" })
-                  : t({ bn: "প্রতিষ্ঠান ও অনুমোদিত প্রতিনিধির তথ্য (Organisation Details)", en: "Organisation & Signatory Details" })}
-              </h2>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 w-fit">
-                {userType === "individual" && <User className="h-3.5 w-3.5 text-emerald-600" />}
-                {userType === "community" && <Users className="h-3.5 w-3.5 text-emerald-600" />}
-                {userType === "organisation" && <Building2 className="h-3.5 w-3.5 text-emerald-600" />}
-                <span className="capitalize">{userType} mode</span>
-              </span>
-            </div>
-
-            {/* Profile Fields Container */}
-            <div className="rounded-3xl border border-slate-200/90 bg-slate-50/60 p-6 sm:p-7 shadow-xs">
-              {/* ───────────────── 2A. INDIVIDUAL USER FIELDS ───────────────── */}
-              {userType === "individual" && (
-                <div className="space-y-5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 rounded-xl px-3 py-1.5 w-fit border border-emerald-100">
-                    <User className="h-3.5 w-3.5" />
-                    <span>{t({ bn: "ব্যক্তিগত উদ্যোক্তা ভেরিফিকেশন ফিল্ড", en: "Individual Creator Verification Fields" })}</span>
-                  </div>
-
-                  <div className="grid gap-5 md:grid-cols-3">
-                    {/* Full Name */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "আপনার পূর্ণ নাম (Full Name)", en: "Full Name" })} <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder={t({ bn: "যেমন: মোহাম্মদ রহিম", en: "e.g., Mohammad Rahim" })}
-                        value={form.creatorName}
-                        onChange={(e) => setForm({ ...form, creatorName: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* NID / Passport (Required for Individual) */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "জাতীয় পরিচয়পত্র (NID) নম্বর", en: "National ID (NID) Number" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="text"
-                        placeholder="1987654321098"
-                        value={form.nidNumber}
-                        onChange={(e) => setForm({ ...form, nidNumber: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Profession / Occupation */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "পেশা / কর্মসংস্থান (Profession)", en: "Profession / Occupation" })}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={t({ bn: "যেমন: সফটওয়্যার ইঞ্জিনিয়ার / ব্যবসায়ী", en: "e.g., Business Owner / Engineer" })}
-                        value={form.profession}
-                        onChange={(e) => setForm({ ...form, profession: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Email */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "ব্যক্তিগত ইমেইল (Email Address)", en: "Personal Email Address" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="email"
-                        placeholder="name@example.com"
-                        value={form.creatorEmail}
-                        onChange={(e) => setForm({ ...form, creatorEmail: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Phone */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "মোবাইল নাম্বার (Mobile Number)", en: "Mobile Number" })} <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="tel"
-                        placeholder="017xxxxxxxx"
-                        value={form.creatorPhone}
-                        onChange={(e) => setForm({ ...form, creatorPhone: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Present Address */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "বর্তমান ঠিকানা (Present Address)", en: "Present Address" })}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={t({ bn: "যেমন: বাড়ি ১২, রোড ৫, ধানমন্ডি, ঢাকা", en: "e.g., House 12, Road 5, Dhanmondi, Dhaka" })}
-                        value={form.officeAddress}
-                        onChange={(e) => setForm({ ...form, officeAddress: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ───────────────── 2B. COMMUNITY / COOPERATIVE FIELDS ───────────────── */}
-              {userType === "community" && (
-                <div className="space-y-5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 rounded-xl px-3 py-1.5 w-fit border border-emerald-100">
-                    <Users className="h-3.5 w-3.5" />
-                    <span>{t({ bn: "কমিউনিটি ও সমবায় পরিচিতি ফিল্ড", en: "Community & Cooperative Entity Fields" })}</span>
-                  </div>
-
-                  <div className="grid gap-5 md:grid-cols-3">
-                    {/* Community / Cooperative Name */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "সমিতি বা ক্লাবের নাম (Community Name)", en: "Community / Group Name" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder={t({ bn: "যেমন: ঢাকা গ্রিন ইনভেস্টরস ক্লাব", en: "e.g., Dhaka Green Investors Club" })}
-                        value={form.companyName}
-                        onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Representative Name */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "প্রধান প্রতিনিধির নাম (Lead Representative)", en: "Lead Representative Name" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder={t({ bn: "যেমন: রফিকুল ইসলাম", en: "e.g., Rafiqul Islam" })}
-                        value={form.creatorName}
-                        onChange={(e) => setForm({ ...form, creatorName: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Designation in Community */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "প্রতিনিধির পদবি (Designation)", en: "Designation in Community" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder={t({ bn: "যেমন: সভাপতি / সাধারণ সম্পাদক / কনভেনার", en: "e.g., President / Secretary / Lead" })}
-                        value={form.designation}
-                        onChange={(e) => setForm({ ...form, designation: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Total Members */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "কমিউনিটি সদস্য সংখ্যা (Total Members)", en: "Total Community Members" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="number"
-                        min={2}
-                        placeholder="50"
-                        value={form.memberCount || ""}
-                        onChange={(e) => setForm({ ...form, memberCount: Number(e.target.value) })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Contact Email */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "যোগাযোগের ইমেইল (Contact Email)", en: "Contact Email" })} <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="email"
-                        placeholder="community@example.com"
-                        value={form.creatorEmail}
-                        onChange={(e) => setForm({ ...form, creatorEmail: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Contact Phone */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "মোবাইল নাম্বার (Contact Phone)", en: "Contact Phone Number" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="tel"
-                        placeholder="017xxxxxxxx"
-                        value={form.creatorPhone}
-                        onChange={(e) => setForm({ ...form, creatorPhone: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Community Reg No */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "সমিতি বা ক্লাবের নিবন্ধন নং (ঐচ্ছিক)", en: "Association Reg No. (Optional)" })}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="REG-2024-987"
-                        value={form.communityRegNo}
-                        onChange={(e) => setForm({ ...form, communityRegNo: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Community Office Address */}
-                    <div className="md:col-span-2">
-                      <label className={labelStyle}>
-                        {t({ bn: "কমিউনিটি কার্যালয়ের ঠিকানা (Office Address)", en: "Office / Meeting Address" })}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={t({ bn: "যেমন: সেক্টর ৪, উত্তরা, ঢাকা", en: "e.g., Sector 4, Uttara, Dhaka" })}
-                        value={form.officeAddress}
-                        onChange={(e) => setForm({ ...form, officeAddress: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ───────────────── 2C. ORGANISATION / CORPORATE FIELDS ───────────────── */}
-              {userType === "organisation" && (
-                <div className="space-y-5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 rounded-xl px-3 py-1.5 w-fit border border-emerald-100">
-                    <Building2 className="h-3.5 w-3.5" />
-                    <span>{t({ bn: "প্রতিষ্ঠান ও কর্পোরেট প্রোফাইল ফিল্ড", en: "Organisation & Corporate Verification Fields" })}</span>
-                  </div>
-
-                  <div className="grid gap-5 md:grid-cols-3">
-                    {/* Legal Company Name */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "প্রতিষ্ঠানের পূর্ণ নাম (Legal Entity Name)", en: "Company Legal Name" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder={t({ bn: "যেমন: অ্যাপেক্স অ্যাগ্রোটেক লিমিটেড", en: "e.g., Apex Agrotech Limited" })}
-                        value={form.companyName}
-                        onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Entity Business Type */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "প্রতিষ্ঠানের ধরন (Business Type)", en: "Business Entity Type" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        value={form.businessType}
-                        onChange={(e) => setForm({ ...form, businessType: e.target.value })}
-                        className={inputStyle}
-                      >
-                        <option value="Private Limited Company">{t({ bn: "প্রাইভেট লিমিটেড কোম্পানি", en: "Private Limited Company" })}</option>
-                        <option value="Public Limited Company">{t({ bn: "পাবলিক লিমিটেড কোম্পানি", en: "Public Limited Company" })}</option>
-                        <option value="Partnership Firm">{t({ bn: "অংশীদারি কারবার (Partnership)", en: "Partnership Firm" })}</option>
-                        <option value="Sole Proprietorship">{t({ bn: "একমালিকানা প্রতিষ্ঠান (Proprietorship)", en: "Sole Proprietorship" })}</option>
-                        <option value="NGO / Non-Profit / Trust">{t({ bn: "এনজিও / ট্রাস্ট / অলাভজনক", en: "NGO / Trust / Non-Profit" })}</option>
-                      </select>
-                    </div>
-
-                    {/* Trade License / RJSC Registration No */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "ট্রেড লাইসেন্স বা আরজেএসসি নং", en: "Trade License / RJSC Reg No." })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder="TRAD/DNCC/123456/2025"
-                        value={form.tradeLicenseNo}
-                        onChange={(e) => setForm({ ...form, tradeLicenseNo: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Authorized Person Name */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "অনুমোদিত প্রতিনিধির নাম (Signatory)", en: "Authorized Signatory Name" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder={t({ bn: "যেমন: তানভীর আহমেদ", en: "e.g., Tanvir Ahmed" })}
-                        value={form.creatorName}
-                        onChange={(e) => setForm({ ...form, creatorName: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Designation */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "প্রতিনিধির পদবি (Designation)", en: "Designation" })} <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder={t({ bn: "যেমন: Managing Director / CEO", en: "e.g., Managing Director / CEO" })}
-                        value={form.designation}
-                        onChange={(e) => setForm({ ...form, designation: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Official Email */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "অফিসিয়াল ইমেইল (Official Email)", en: "Official Corporate Email" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="email"
-                        placeholder="corporate@company.com"
-                        value={form.creatorEmail}
-                        onChange={(e) => setForm({ ...form, creatorEmail: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Official Phone */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "অফিসিয়াল ফোন (Official Phone)", en: "Official Phone Number" })}{" "}
-                        <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        required
-                        type="tel"
-                        placeholder="+88017xxxxxxxx"
-                        value={form.creatorPhone}
-                        onChange={(e) => setForm({ ...form, creatorPhone: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* TIN / BIN Number */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "TIN বা BIN নম্বর (ঐচ্ছিক)", en: "TIN / BIN Number (Optional)" })}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="TIN: 123456789012"
-                        value={form.tinBinNo}
-                        onChange={(e) => setForm({ ...form, tinBinNo: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Website */}
-                    <div>
-                      <label className={labelStyle}>
-                        {t({ bn: "অফিসিয়াল ওয়েবসাইট (Website URL)", en: "Official Website URL" })}
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://company.com"
-                        value={form.websiteUrl}
-                        onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-
-                    {/* Registered Corporate Office */}
-                    <div className="md:col-span-3">
-                      <label className={labelStyle}>
-                        {t({ bn: "নিবন্ধিত কর্পোরেট অফিসের ঠিকানা", en: "Registered Corporate Office Address" })}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={t({ bn: "লেভেল ৫, গুলশান সেন্টার পয়েন্ট, গুলশান ২, ঢাকা ১২১২", en: "Level 5, Gulshan Center Point, Gulshan 2, Dhaka 1212" })}
-                        value={form.officeAddress}
-                        onChange={(e) => setForm({ ...form, officeAddress: e.target.value })}
-                        className={inputStyle}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ══════════════ SECTION 3: INVESTMENT & TIMELINE ══════════════ */}
+          {/* ══════════════ SECTION 2: INVESTMENT & TIMELINE ══════════════ */}
           <div className="mb-10 border-t border-slate-100 pt-8">
             <h2 className="mb-5 text-lg font-bold text-slate-900 flex items-center gap-2.5">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
-                3
+                2
               </span>
               {t({ bn: "বিনিয়োগ ও মেয়াদ পরিকল্পনা (Investment & Timeline)", en: "Investment & Timeline" })}
             </h2>
@@ -1371,218 +767,85 @@ export default function CreatePublicProjectPage() {
             </div>
           </div>
 
-          {/* ══════════════ SECTION 4: ROLE-BASED DYNAMIC MEDIA & DOCUMENTS CARDS ══════════════ */}
+          {/* ══════════════ SECTION 3: PROJECT MEDIA & DOCUMENTS ══════════════ */}
           <div className="mb-10 border-t border-slate-100 pt-8">
             <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
-                    4
+                    3
                   </span>
                   {t({ bn: "প্রজেক্টের ছবি ও কাগজপত্র (Media & Documents)", en: "Project Media & Documents" })}
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  {userType === "individual"
-                    ? t({
-                        bn: "ব্যক্তিগত উদ্যোগের জন্য ২টি কার্ড (১টি আবশ্যক ছবি কার্ড ও ১টি প্রয়োজনীয় PDF ফাইল কার্ড)।",
-                        en: "2 document cards for Individual (1 Required Image card & 1 Optional PDF file card).",
-                      })
-                    : userType === "community"
-                    ? t({
-                        bn: "কমিউনিটি বা সমবায় উদ্যোগের জন্য ৫টি কার্ড (৩টি আবশ্যক ও ২টি ঐচ্ছিক নথি)।",
-                        en: "5 document cards for Community (3 Required & 2 Optional).",
-                      })
-                    : t({
-                        bn: "প্রতিষ্ঠান বা কর্পোরেট উদ্যোগের জন্য ৬টি কার্ড (৪টি আবশ্যক ও ২টি ঐচ্ছিক নথি)।",
-                        en: "6 document cards for Organisation (4 Required & 2 Optional).",
-                      })}
+                  {t({
+                    bn: "প্রজেক্টের ছবি ও প্রাসঙ্গিক নথিপত্র যুক্ত করুন। ছবি কার্ড আবশ্যক, বাকি ডকুমেন্টস ঐচ্ছিক।",
+                    en: "Upload project photos and relevant proposal files. Images card is required, other documents are optional.",
+                  })}
                 </p>
               </div>
 
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 border border-emerald-100">
                 <FileCheck className="h-3.5 w-3.5 text-emerald-600" />
-                <span>
-                  {userType === "individual" && t({ bn: "মোট ২টি কার্ড", en: "Total 2 Cards" })}
-                  {userType === "community" && t({ bn: "মোট ৫টি কার্ড", en: "Total 5 Cards" })}
-                  {userType === "organisation" && t({ bn: "মোট ৬টি কার্ড", en: "Total 6 Cards" })}
-                </span>
+                <span>{t({ bn: "মোট ৪টি কার্ড", en: "Total 4 Cards" })}</span>
               </span>
             </div>
 
-            {/* ───────────────── 4A. INDIVIDUAL: 2 CARDS (1 Required Image, 1 Optional PDF) ───────────────── */}
-            {userType === "individual" && (
-              <div className="grid gap-5 sm:grid-cols-2">
-                {renderUploadCard(
-                  "projectImages",
-                  t({ bn: "১. প্রজেক্টের ছবি সমূহ (Project Images)", en: "1. Project Images (Multiple)" }),
-                  t({
-                    bn: "উচ্চমানের প্রজেক্ট বা সাইটের ছবি যুক্ত করুন (PNG, JPG, WEBP)। একাধিক ছবি নির্বাচন করা যাবে।",
-                    en: "Upload high-quality project & site photos (PNG, JPG, WEBP). Multiple files allowed.",
-                  }),
-                  true,
-                  <ImagePlus className="h-4 w-4" />,
-                  "image/*",
-                  true
-                )}
+            <div className="grid gap-5 sm:grid-cols-2">
+              {/* Card 1: Project Images (Multiple, Required) */}
+              {renderUploadCard(
+                "projectImages",
+                t({ bn: "১. প্রজেক্টের ছবি সমূহ (Project Images)", en: "1. Project Images (Multiple)" }),
+                t({
+                  bn: "উচ্চমানের প্রজেক্ট বা সাইটের ছবি যুক্ত করুন (PNG, JPG, WEBP)। একাধিক ছবি নির্বাচন করা যাবে।",
+                  en: "Upload high-quality project & site photos (PNG, JPG, WEBP). Multiple files allowed.",
+                }),
+                true,
+                <ImagePlus className="h-4 w-4" />,
+                "image/*",
+                true
+              )}
 
-                {renderUploadCard(
-                  "necessaryDoc",
-                  t({ bn: "২. প্রয়োজনীয় কাগজপত্র ও ডকুমেন্টস (PDF)", en: "2. Necessary Documents / PDF File" }),
-                  t({
-                    bn: "উদ্যোক্তার NID, জমির দলিল, প্রসপেক্টাস বা প্রয়োজনীয় অন্যান্য কাগজপত্র ফাইল যুক্ত করুন (PDF, DOCX)।",
-                    en: "Attach NID copy, land deed, prospectus or any necessary project documents (PDF, DOCX).",
-                  }),
-                  false,
-                  <Upload className="h-4 w-4" />,
-                  ".pdf,.doc,.docx,image/*",
-                  true
-                )}
-              </div>
-            )}
+              {/* Card 2: Brochure / Pitch Deck (Optional) */}
+              {renderUploadCard(
+                "brochureDoc",
+                t({ bn: "২. প্রজেক্ট ব্রোশিউর ও প্রসপেক্টাস (Brochure)", en: "2. Project Brochure / Proposal" }),
+                t({
+                  bn: "প্রজেক্টের পরিচিতি ব্রোশিউর, প্রেজেন্টেশন বা পিচ ডেক ফাইল যুক্ত করুন (PDF, DOCX)।",
+                  en: "Attach detailed project brochure, prospectus or proposal document (PDF, DOCX).",
+                }),
+                false,
+                <FileText className="h-4 w-4" />,
+                ".pdf,.doc,.docx"
+              )}
 
-            {/* ───────────────── 4B. COMMUNITY: 5 CARDS (3 Required, 2 Optional) ───────────────── */}
-            {userType === "community" && (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {renderUploadCard(
-                  "projectImages",
-                  t({ bn: "১. প্রজেক্ট ও সাইটের ছবি", en: "1. Project Images (Multiple)" }),
-                  t({
-                    bn: "কমিউনিটি বা সমবায় প্রকল্পের স্পষ্ট ছবি (PNG, JPG, WEBP)। একাধিক ছবি নির্বাচনযোগ্য।",
-                    en: "Upload clear images of project area & location (PNG, JPG, WEBP).",
-                  }),
-                  true,
-                  <ImagePlus className="h-4 w-4" />,
-                  "image/*",
-                  true
-                )}
+              {/* Card 3: Legal Clearances & Approvals (Optional) */}
+              {renderUploadCard(
+                "legalDoc",
+                t({ bn: "৩. অনুমোদন ও আইনি কাগজপত্র (Legal Clearances)", en: "3. Legal Approvals & Clearances" }),
+                t({
+                  bn: "প্রজেক্ট সংক্রান্ত অনুমোদন, পরিবেশ ছাড়পত্র, রাজউক/পৌরসভা প্ল্যান বা দলিল কপি (PDF/ছবি)।",
+                  en: "Govt / municipal approval letters, clearance certificates, or land documents (PDF/JPG).",
+                }),
+                false,
+                <ShieldCheck className="h-4 w-4" />,
+                ".pdf,.doc,.docx,image/*",
+                true
+              )}
 
-                {renderUploadCard(
-                  "resolutionDoc",
-                  t({ bn: "২. সমিতির রেজোলিউশন কপি", en: "2. Community Resolution / Minutes" }),
-                  t({
-                    bn: "যৌথ সভার সিদ্ধান্ত, শেয়ার অফারিংয়ের অনুমোদন সংক্রান্ত সভার রেজোলিউশন কপি (PDF)।",
-                    en: "Resolution copy of executive committee meeting approving this share offering (PDF).",
-                  }),
-                  true,
-                  <FileText className="h-4 w-4" />,
-                  ".pdf,.doc,.docx,image/*"
-                )}
-
-                {renderUploadCard(
-                  "memberListDoc",
-                  t({ bn: "৩. সদস্য তালিকা ও স্বাক্ষর শিট", en: "3. Member List & Signatures" }),
-                  t({
-                    bn: "কমিউনিটির সক্রিয় সদস্যদের নাম, পদবি এবং প্রতিনিধির অনুমোদিত স্বাক্ষর শিট (PDF, DOCX)।",
-                    en: "Official member list with signatures of lead representative / president (PDF, DOCX).",
-                  }),
-                  true,
-                  <Users className="h-4 w-4" />,
-                  ".pdf,.doc,.docx"
-                )}
-
-                {renderUploadCard(
-                  "regCertDoc",
-                  t({ bn: "৪. সমিতি বা ক্লাব নিবন্ধন সনদ (ঐচ্ছিক)", en: "4. Association Reg Certificate" }),
-                  t({
-                    bn: "সরকারি সমবায় অধিদপ্তর বা সমাজসেবা কার্যালয়ের অফিসিয়াল নিবন্ধন সনদ (যদি থাকে)।",
-                    en: "Government cooperative department or society registration certificate (if registered).",
-                  }),
-                  false,
-                  <BadgeCheck className="h-4 w-4" />,
-                  ".pdf,.jpg,.jpeg,.png"
-                )}
-
-                {renderUploadCard(
-                  "bylawDoc",
-                  t({ bn: "৫. গঠনতন্ত্র বা বাই-ল কপি (ঐচ্ছিক)", en: "5. By-laws & Constitution Copy" }),
-                  t({
-                    bn: "সমিতির পরিচালনা সংক্রান্ত গঠনতন্ত্র, নিয়মাবলী বা বাই-ল ডকুমেন্ট ফাইল (PDF)।",
-                    en: "Cooperative by-laws, constitution rules and operating policies document (Optional).",
-                  }),
-                  false,
-                  <Upload className="h-4 w-4" />,
-                  ".pdf,.doc,.docx"
-                )}
-              </div>
-            )}
-
-            {/* ───────────────── 4C. ORGANISATION: 6 CARDS (4 Required, 2 Optional) ───────────────── */}
-            {userType === "organisation" && (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {renderUploadCard(
-                  "projectImages",
-                  t({ bn: "১. প্রজেক্ট ছবি ও প্রেজেন্টেশন", en: "1. Project Images & Presentation" }),
-                  t({
-                    bn: "বাণিজ্যিক সাইট, মডেল, থ্রিডি রেন্ডার বা প্রজেক্ট ছবি (PNG, JPG, WEBP)।",
-                    en: "Commercial project renders, site photos and presentation visuals (Multiple).",
-                  }),
-                  true,
-                  <ImagePlus className="h-4 w-4" />,
-                  "image/*",
-                  true
-                )}
-
-                {renderUploadCard(
-                  "tradeLicenseDoc",
-                  t({ bn: "২. হালনাগাদ ট্রেড লাইসেন্স", en: "2. Trade License Copy" }),
-                  t({
-                    bn: "সিটি কর্পোরেশন / পৌরসভার চলতি অর্থবছরের নবায়নকৃত ট্রেড লাইসেন্স কপি (PDF, JPG)।",
-                    en: "Up-to-date trade license copy renewed for current fiscal year (PDF, JPG).",
-                  }),
-                  true,
-                  <FileBadge className="h-4 w-4" />,
-                  ".pdf,.jpg,.jpeg,.png"
-                )}
-
-                {renderUploadCard(
-                  "incorpDoc",
-                  t({ bn: "৩. ইনকর্পোরেশন বা আরজেএসসি সনদ", en: "3. RJSC Incorporation / Reg" }),
-                  t({
-                    bn: "RJSC সার্টিফিকেট অব ইনকর্পোরেশন অথবা অংশীদারি ফার্মের পার্টনারশিপ ডিড কপি (PDF)।",
-                    en: "RJSC Certificate of Incorporation or registered partnership deed (PDF).",
-                  }),
-                  true,
-                  <Building2 className="h-4 w-4" />,
-                  ".pdf,.jpg,.jpeg,.png"
-                )}
-
-                {renderUploadCard(
-                  "tinDoc",
-                  t({ bn: "৪. ই-টিন ও ট্যাক্স রিটার্ন সনদ", en: "4. Corporate e-TIN & Tax Return" }),
-                  t({
-                    bn: "কোম্পানির ১২ ডিজিটের ই-টিন সার্টিফিকেট ও সর্বশেষ আয়কর রিটার্ন দাখিলের স্লিপ (PDF)।",
-                    en: "Company e-TIN certificate & latest income tax acknowledgment receipt (PDF).",
-                  }),
-                  true,
-                  <FileText className="h-4 w-4" />,
-                  ".pdf,.jpg,.jpeg,.png"
-                )}
-
-                {renderUploadCard(
-                  "boardResDoc",
-                  t({ bn: "৫. বোর্ড রেজোলিউশন / POA (ঐচ্ছিক)", en: "5. Board Resolution / Power of Attorney" }),
-                  t({
-                    bn: "শেয়ার বিক্রয় ও ফান্ড সংগ্রহের পক্ষে পরিচালকদের বোর্ড রেজোলিউশন অথবা পাওয়ার অব অ্যাটর্নি।",
-                    en: "Board of Directors resolution approving the share issue or authorization letter.",
-                  }),
-                  false,
-                  <Upload className="h-4 w-4" />,
-                  ".pdf,.doc,.docx"
-                )}
-
-                {renderUploadCard(
-                  "auditDoc",
-                  t({ bn: "৬. অডিট রিপোর্ট বা প্রসপেক্টাস (ঐচ্ছিক)", en: "6. Audited Financials / Prospectus" }),
-                  t({
-                    bn: "সিএ ফার্ম কর্তৃক নিরীক্ষিত আর্থিক বিবরণী বা বিস্তারিত বিনিয়োগ প্রসপেক্টাস ব্রোশিউর।",
-                    en: "Audited financial statements by chartered accountants or investment brochure (Optional).",
-                  }),
-                  false,
-                  <Upload className="h-4 w-4" />,
-                  ".pdf,.doc,.docx"
-                )}
-              </div>
-            )}
+              {/* Card 4: Business Plan & Projections (Optional) */}
+              {renderUploadCard(
+                "financialDoc",
+                t({ bn: "৪. আর্থিক পরিকল্পনা ও প্রক্ষেপণ (Financials)", en: "4. Business Plan & Financials" }),
+                t({
+                  bn: "প্রজেক্টের আয়ের প্রক্ষেপণ, রিটার্ন হিসাব ও ব্যবসায়িক পরিকল্পনা নথি (PDF, Excel)।",
+                  en: "Financial projections, revenue model, and estimated cashflow documents (Optional).",
+                }),
+                false,
+                <Briefcase className="h-4 w-4" />,
+                ".pdf,.doc,.docx,.xls,.xlsx"
+              )}
+            </div>
           </div>
 
           {/* ══════════════ SUBMIT BUTTON ══════════════ */}
@@ -1602,7 +865,7 @@ export default function CreatePublicProjectPage() {
             </button>
             <p className="mt-3 text-center text-xs text-slate-400">
               {t({
-                bn: "সাবমিট করার পর আপনার ইমেইল ও মোবাইল দিয়ে আপনার প্রজেক্ট স্ট্যাটাস ট্র্যাক করতে পারবেন।",
+                bn: "সাবমিট করার পর আপনার সেলার ড্যাশবোর্ড থেকে প্রজেক্টের স্ট্যাটাস ট্র্যাক করতে পারবেন।",
                 en: "After submission, you can track your project review status from your seller dashboard.",
               })}
             </p>
