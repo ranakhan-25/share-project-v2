@@ -1,0 +1,373 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  ArrowUpRight,
+  ChevronDown,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  Menu,
+  ShieldCheck,
+  UserRound,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useLang, type Bi } from "@/lib/i18n";
+import { Logo } from "./Logo";
+import { LangSwitch } from "./LangSwitch";
+import {
+  clearStoredTokens,
+  getStoredAccessToken,
+  getStoredUser,
+  type StoredUser,
+} from "@/lib/admin-auth/adminAuthStorage";
+
+export const NAV_LINKS: { href: string; label: Bi }[] = [
+  { href: "/", label: { bn: "হোম", en: "Home" } },
+  { href: "/projects", label: { bn: "প্রজেক্ট", en: "Projects" } },
+  { href: "/investments", label: { bn: "ইনভেস্টমেন্ট", en: "Investment" } },
+  { href: "/features", label: { bn: "ফিচার", en: "Features" } },
+  { href: "/about", label: { bn: "আমাদের সম্পর্কে", en: "About" } },
+  { href: "/contact", label: { bn: "যোগাযোগ", en: "Contact" } },
+];
+
+export function Navbar() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { t } = useLang();
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  // Authentication State
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    setOpen(false);
+    setProfileDropdownOpen(false);
+
+    // Read stored authentication session
+    const token = getStoredAccessToken();
+    const stored = getStoredUser();
+    if (token) {
+      let activeUser = stored || { name: "User", role: "user" };
+      if (activeUser.email === "owner@shareproject.com" && activeUser.role !== "project-owner") {
+        activeUser = { ...activeUser, role: "project-owner" };
+        try {
+          localStorage.setItem("share-project:user", JSON.stringify(activeUser));
+        } catch {}
+      }
+      setUser(activeUser);
+    } else {
+      setUser(null);
+    }
+  }, [pathname]);
+
+  // Click outside listener for profile dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  const handleLogout = () => {
+    const isSuper =
+      user?.role === "super-admin" ||
+      String(user?.role || "").toLowerCase().includes("admin") ||
+      Boolean(user?.isSuperUser);
+    clearStoredTokens();
+    setUser(null);
+    setProfileDropdownOpen(false);
+    if (isSuper) {
+      router.replace("/admin/login");
+    } else {
+      router.replace("/login");
+    }
+  };
+
+  const displayName = user?.name || user?.username || "Account";
+  const initials = displayName
+    .split(" ")
+    .map((p) => p[0])
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const userRoleRaw = String(user?.role || "").toLowerCase();
+  const isSuperAdmin =
+    user?.email !== "owner@shareproject.com" &&
+    (userRoleRaw === "super-admin" ||
+      userRoleRaw === "super_admin" ||
+      userRoleRaw === "admin" ||
+      Boolean(user?.isSuperUser));
+
+  const roleLabel = isSuperAdmin
+    ? "Admin"
+    : user?.email === "owner@shareproject.com" || userRoleRaw === "project-owner" || userRoleRaw === "owner" || userRoleRaw === "seller"
+    ? "Seller"
+    : userRoleRaw === "investor" || userRoleRaw === "buyer"
+    ? "Buyer"
+    : user?.role
+    ? String(user.role).replace(/[-_]/g, " ")
+    : "Member";
+
+  const dashboardHref = isSuperAdmin ? "/admin/dashboard" : "/dashboard";
+
+  return (
+    <header
+      className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${
+        scrolled
+          ? "border-b border-black/8 bg-white/80 py-2.5 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.12)] backdrop-blur-xl"
+          : "border-b border-transparent bg-transparent py-4"
+      }`}
+    >
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 sm:px-8">
+        <Logo />
+
+        {/* desktop menu */}
+        <ul className="relative hidden items-center gap-1 rounded-full bg-black/[0.04] p-1 ring-1 ring-black/8 md:flex">
+          {NAV_LINKS.map((l) => {
+            const active =
+              l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+            return (
+              <li key={l.href}>
+                <Link
+                  href={l.href}
+                  className={`relative block rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    active ? "text-white" : "text-ink-950/60 hover:text-ink-950"
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="nav-pill"
+                      className="absolute inset-0 -z-0 rounded-full bg-ink-950"
+                      transition={{
+                        type: "spring",
+                        stiffness: 380,
+                        damping: 32,
+                      }}
+                    />
+                  )}
+                  <span className="relative z-10">{t(l.label)}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:block">
+            <LangSwitch id="nav-lang" />
+          </div>
+          {user ? (
+            <div ref={profileRef} className="relative hidden sm:block">
+              <button
+                type="button"
+                onClick={() => setProfileDropdownOpen((v) => !v)}
+                className="flex items-center gap-2 rounded-full border border-black/10 bg-white/90 py-1 pl-1 pr-3 text-xs font-semibold text-slate-800 shadow-xs transition hover:border-black/20 hover:bg-white active:scale-95"
+              >
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 font-bold text-white shadow-xs">
+                  {initials || "U"}
+                </span>
+                <div className="text-left leading-tight max-w-[130px]">
+                  <p className="truncate font-bold text-slate-900">{displayName}</p>
+                  <p className="truncate text-[10px] text-slate-400 font-medium capitalize">
+                    {roleLabel}
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`h-3.5 w-3.5 text-slate-400 transition-transform ${
+                    profileDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              <AnimatePresence>
+                {profileDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl backdrop-blur-xl"
+                  >
+                    <div className="px-3 py-2.5 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
+                            isSuperAdmin
+                              ? "bg-slate-900 text-emerald-400"
+                              : roleLabel === "Seller"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : roleLabel === "Buyer"
+                              ? "bg-sky-100 text-sky-800"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {isSuperAdmin && <ShieldCheck className="h-3 w-3" />}
+                          {roleLabel}
+                        </span>
+                      </div>
+                      <p className="truncate text-xs font-bold text-slate-900 mt-1">{displayName}</p>
+                      <p className="truncate text-[11px] text-slate-400">{user.email || ""}</p>
+                    </div>
+
+                    <div className="py-1">
+                      <Link
+                        href={dashboardHref}
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        <LayoutDashboard className="h-4 w-4 text-emerald-600" />
+                        {isSuperAdmin ? "Admin Dashboard" : t({ bn: "ড্যাশবোর্ড", en: "Dashboard" })}
+                      </Link>
+
+                      {!isSuperAdmin && (
+                        <Link
+                          href="/dashboard/profile"
+                          onClick={() => setProfileDropdownOpen(false)}
+                          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                        >
+                          <UserRound className="h-4 w-4 text-slate-400" />
+                          {t({ bn: "প্রোফাইল", en: "Profile" })}
+                        </Link>
+                      )}
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                      >
+                        <LogOut className="h-4 w-4 text-rose-500" />
+                        {t({ bn: "লগআউট", en: "Log out" })}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="group relative hidden items-center gap-2 overflow-hidden rounded-full bg-gradient-to-r from-emerald-400 to-sky-400 px-5 py-2.5 text-sm font-semibold text-ink-950 shadow-lg shadow-emerald-500/25 transition-transform hover:scale-[1.03] active:scale-95 sm:inline-flex"
+            >
+              <LogIn className="h-4 w-4" />
+              {t({ bn: "লগইন", en: "Login" })}
+              <span className="absolute inset-0 -translate-x-full bg-white/30 skew-x-12 transition-transform duration-700 group-hover:translate-x-full" />
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Menu"
+            className="grid h-10 w-10 place-items-center rounded-full bg-black/5 text-ink-950 ring-1 ring-black/10 md:hidden"
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
+      </nav>
+
+      {/* mobile drawer */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-x-3 top-[68px] z-50 rounded-3xl border border-black/10 bg-white/95 p-4 shadow-2xl backdrop-blur-2xl md:hidden"
+          >
+            <ul className="space-y-1">
+              {NAV_LINKS.map((l, i) => {
+                const active =
+                  l.href === "/"
+                    ? pathname === "/"
+                    : pathname.startsWith(l.href);
+                return (
+                  <motion.li
+                    key={l.href}
+                    initial={{ opacity: 0, x: -16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.05 * i }}
+                  >
+                    <Link
+                      href={l.href}
+                      className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-base font-medium ${
+                        active
+                          ? "bg-ink-950 text-white"
+                          : "text-ink-950/70 hover:bg-black/5"
+                      }`}
+                    >
+                      {t(l.label)}
+                      <ArrowUpRight className="h-4 w-4 opacity-60" />
+                    </Link>
+                  </motion.li>
+                );
+              })}
+            </ul>
+            <div className="mt-4 flex flex-col gap-3 border-t border-black/10 pt-4">
+              <div className="flex items-center justify-between">
+                <LangSwitch id="nav-lang-m" />
+                {user && (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:underline"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    {t({ bn: "লগআউট", en: "Log out" })}
+                  </button>
+                )}
+              </div>
+
+              {user ? (
+                <Link
+                  href={dashboardHref}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3 text-sm font-bold text-white shadow-xs"
+                >
+                  <LayoutDashboard className="h-4 w-4 text-emerald-400" />
+                  <span>{isSuperAdmin ? "Admin Dashboard" : t({ bn: "ড্যাশবোর্ড", en: "Dashboard" })}</span>
+                  <span className="text-xs text-slate-400">({displayName})</span>
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-sky-400 px-5 py-2.5 text-sm font-semibold text-ink-950"
+                >
+                  <LogIn className="h-4 w-4" />
+                  {t({ bn: "লগইন", en: "Login" })}
+                </Link>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </header>
+  );
+}
