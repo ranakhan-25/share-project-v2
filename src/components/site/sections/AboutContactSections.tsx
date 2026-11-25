@@ -40,7 +40,7 @@ export function AboutStory() {
     { icon: Handshake, title: { bn: "আমাদের মূল্যবোধ", en: "Our values" }, text: { bn: "সততা, স্বচ্ছতা ও দায়বদ্ধতা — প্রতিটি সিদ্ধান্তের কেন্দ্রে।", en: "Integrity, transparency and accountability at the core of every decision." }, g: "from-amber-300 to-orange-500" },
   ];
   return (
-    <section className="bg-white py-24 sm:py-32">
+    <section className="bg-white py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <div className="grid items-center gap-14 lg:grid-cols-2">
           <Reveal>
@@ -82,7 +82,7 @@ export function AboutStory() {
           </Reveal>
         </div>
 
-        <div className="mt-28 grid gap-6 md:grid-cols-3">
+        <div className="mt-10 sm:mt-12 grid gap-6 md:grid-cols-3">
           {cards.map((c, i) => (
             <Reveal key={i} delay={i * 0.1}>
               <div className="group h-full rounded-3xl border border-slate-200 p-8 transition duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-slate-900/10">
@@ -118,14 +118,14 @@ export function AboutTimeline() {
     { year: 2026, icon: Handshake, title: { bn: "১২ হাজার+ শেয়ারহোল্ডার", en: "12,000+ shareholders" }, text: { bn: "দেশজুড়ে ৪৮টির বেশি প্রজেক্টে আমাদের সঙ্গী ১২ হাজারেরও বেশি মানুষ।", en: "Over 12,000 people are partnering with us across 48+ projects nationwide." } },
   ];
   return (
-    <section className="relative overflow-hidden bg-ink-950 py-24 text-white sm:py-32">
+    <section className="relative overflow-hidden bg-ink-950 py-10 sm:py-14 text-white">
       <div className="bg-grid absolute inset-0 opacity-60" />
       <div className="relative mx-auto max-w-4xl px-5 sm:px-8">
         <SectionHeading dark eyebrow={{ bn: "যাত্রাপথ", en: "Our journey" }} title={{ bn: "বছর বছর এগিয়ে চলা", en: "Growing, year after year" }} />
-        <div ref={ref} className="relative mt-20">
+        <div ref={ref} className="relative mt-8 sm:mt-10">
           <div className="absolute bottom-0 left-5 top-0 w-px bg-white/10 sm:left-1/2" />
           <motion.div style={{ scaleY, transformOrigin: "top" }} className="absolute bottom-0 left-5 top-0 w-px bg-gradient-to-b from-emerald-300 to-sky-400 sm:left-1/2" />
-          <div className="space-y-14">
+          <div className="space-y-6 sm:space-y-8">
             {events.map((e, i) => (
               <Reveal key={i} x={i % 2 ? 40 : -40} y={0}>
                 <div className={`relative flex items-start gap-6 pl-14 sm:pl-0 ${i % 2 ? "sm:flex-row-reverse" : ""}`}>
@@ -157,10 +157,10 @@ export function AboutTeam() {
     { name: { bn: "মেহের নিগার", en: "Meher Nigar" }, role: { bn: "হেড অব ফাইন্যান্স", en: "Head of Finance" }, g: "from-amber-300 to-orange-600", init: "MN" },
   ];
   return (
-    <section className="bg-slate-50 py-24 sm:py-32">
+    <section className="bg-slate-50 py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <SectionHeading eyebrow={{ bn: "আমাদের দল", en: "Our team" }} title={{ bn: "যাঁরা আপনার আস্থার পেছনে", en: "The people behind your trust" }} />
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 sm:mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {team.map((m, i) => (
             <Reveal key={i} delay={i * 0.1}>
               <div className="group overflow-hidden rounded-3xl bg-white p-3 shadow-sm ring-1 ring-slate-200 transition duration-500 hover:-translate-y-2 hover:shadow-2xl">
@@ -197,7 +197,7 @@ export function ContactBlock() {
     "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10";
 
   return (
-    <section className="relative -mt-12 pb-24 sm:pb-28">
+    <section className="relative -mt-6 pb-8 sm:pb-12">
       <div className="mx-auto grid max-w-7xl gap-8 px-5 sm:px-8 lg:grid-cols-[0.8fr_1.2fr]">
         <div className="space-y-4">
           {info.map((it, i) => (
@@ -296,10 +296,10 @@ export function ContactFaq() {
     { q: { bn: "আমার তথ্য কি নিরাপদ?", en: "Is my data safe?" }, a: { bn: "সব সেশন টোকেন-ভিত্তিক এবং অ্যাক্সেস ভূমিকা অনুযায়ী নিয়ন্ত্রিত।", en: "All sessions are token-based and access is controlled by role." } },
   ];
   return (
-    <section className="bg-slate-50 py-24 sm:py-28">
+    <section className="bg-slate-50 py-8 sm:py-12">
       <div className="mx-auto max-w-3xl px-5 sm:px-8">
         <SectionHeading eyebrow={{ bn: "প্রশ্নোত্তর", en: "FAQ" }} title={{ bn: "সচরাচর জিজ্ঞাসা", en: "Frequently asked questions" }} />
-        <div className="mt-12 space-y-3">
+        <div className="mt-6 sm:mt-8 space-y-3">
           {faqs.map((f, i) => {
             const isOpen = open === i;
             return (
@@ -323,7 +323,7 @@ export function ContactFaq() {
             );
           })}
         </div>
-        <Reveal className="mt-12 text-center">
+        <Reveal className="mt-6 sm:mt-8 text-center">
           <Link href="/login" className="group inline-flex items-center gap-2 font-semibold text-emerald-700 hover:text-emerald-800">
             {t({ bn: "ইতিমধ্যে সদস্য? লগইন করুন", en: "Already a member? Log in" })}
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

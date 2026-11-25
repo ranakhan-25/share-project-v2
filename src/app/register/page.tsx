@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
@@ -131,6 +131,61 @@ export default function RegisterPage() {
     );
     return () => clearInterval(id);
   }, [currentSlide]);
+
+  const isFormValid = useMemo(() => {
+    // 1. Basic credentials
+    if (!name.trim()) return false;
+    if (!phone.trim()) return false;
+    if (!email.trim() || !email.includes("@")) return false;
+    if (password.length < 8) return false;
+    if (password !== confirmPassword) return false;
+
+    // 2. Entity-specific required fields
+    if (entityType === "individual") {
+      if (!nidNumber.trim()) return false;
+      if (!presentAddress.trim()) return false;
+    } else if (entityType === "community") {
+      if (!communityName.trim()) return false;
+      if (!representativeName.trim()) return false;
+      if (!communityDesignation.trim()) return false;
+      if (!memberCount || Number(memberCount) <= 0) return false;
+    } else if (entityType === "organisation") {
+      if (!companyName.trim()) return false;
+      if (!tradeLicense.trim()) return false;
+      if (!signatoryName.trim()) return false;
+      if (!signatoryDesignation.trim()) return false;
+      if (!officeAddress.trim()) return false;
+    }
+
+    // 3. Buyer preferences
+    if (userType === "buyer") {
+      if (!buyerBudget.trim()) return false;
+      if (!buyerPreferableCategory.trim()) return false;
+    }
+
+    return true;
+  }, [
+    name,
+    phone,
+    email,
+    password,
+    confirmPassword,
+    entityType,
+    nidNumber,
+    presentAddress,
+    communityName,
+    representativeName,
+    communityDesignation,
+    memberCount,
+    companyName,
+    tradeLicense,
+    signatoryName,
+    signatoryDesignation,
+    officeAddress,
+    userType,
+    buyerBudget,
+    buyerPreferableCategory,
+  ]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,8 +346,10 @@ export default function RegisterPage() {
     }
   };
 
-  const inputCls =
-    "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50";
+  const inputBase =
+    "w-full rounded-2xl border border-slate-200 bg-white py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50";
+  const inputCls = `${inputBase} pl-11 pr-4`;
+  const inputNoIconCls = `${inputBase} px-4`;
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-slate-50 px-4 pt-28 pb-14 text-slate-800 antialiased">
@@ -315,10 +372,10 @@ export default function RegisterPage() {
         initial={{ opacity: 0, y: 30, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-6xl overflow-hidden rounded-[32px] border border-slate-200/90 bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.08)] lg:grid lg:grid-cols-12"
+        className="relative w-full max-w-6xl overflow-hidden rounded-[32px] border border-slate-200/90 bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.08)] lg:grid lg:grid-cols-12 h-[88vh] max-h-[820px] min-h-[620px]"
       >
         {/* LEFT — photo carousel (5 cols) */}
-        <div className="relative hidden min-h-[700px] flex-col justify-between overflow-hidden bg-slate-900 p-10 lg:flex lg:col-span-5">
+        <div className="relative hidden h-full flex-col justify-between overflow-hidden bg-slate-900 p-10 lg:flex lg:col-span-5">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentSlide}
@@ -368,13 +425,9 @@ export default function RegisterPage() {
         </div>
 
         {/* RIGHT — registration form (7 cols) */}
-        <div className="relative flex flex-col justify-center bg-white p-6 sm:p-10 lg:col-span-7 max-h-[92vh] overflow-y-auto">
-          <div className="mx-auto w-full max-w-xl">
-            <div className="lg:hidden mb-4">
-              <Logo tone="dark" />
-            </div>
-
-            {isSuccess ? (
+        <div className="relative flex h-full flex-col bg-white overflow-hidden lg:col-span-7">
+          {isSuccess ? (
+            <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -400,38 +453,39 @@ export default function RegisterPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </motion.div>
-            ) : (
-              <>
-                <motion.div
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="space-y-1"
-                >
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            </div>
+          ) : (
+            <>
+              {/* STATIC PINNED HEADER */}
+              <div className="shrink-0 px-6 pt-5 sm:px-10 sm:pt-7 pb-3 border-b border-slate-100 bg-white z-10 shadow-[0_4px_12px_-4px_rgba(0,0,0,0.03)]">
+                <div className="lg:hidden mb-2">
+                  <Logo tone="dark" />
+                </div>
+                <div className="space-y-0.5">
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                     {t({ bn: "নতুন অ্যাকাউন্ট তৈরি করুন", en: "Create Share Account" })}
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-500">
+                  <p className="text-xs text-slate-500">
                     {t({
                       bn: "সেলার (উদ্যোক্তা) অথবা বায়ার (বিনিয়োগকারী) হিসেবে নিবন্ধন করুন।",
                       en: "Register to join as a Seller (Creator) or Buyer (Investor).",
                     })}
                   </p>
-                </motion.div>
+                </div>
 
-                {/* ══════════════ 1. ROLE SELECTOR (SELLER VS BUYER) ══════════════ */}
-                <div className="mt-5 grid grid-cols-2 gap-3">
+                {/* 1. ROLE SELECTOR */}
+                <div className="mt-3 grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     onClick={() => setUserType("seller")}
-                    className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
+                    className={`flex items-center gap-2.5 rounded-xl border p-2 text-left transition ${
                       userType === "seller"
                         ? "border-emerald-500 bg-emerald-50/80 shadow-xs ring-2 ring-emerald-500/20"
                         : "border-slate-200 bg-slate-50/60 hover:bg-slate-100/70"
                     }`}
                   >
                     <div
-                      className={`grid h-9 w-9 place-items-center rounded-xl transition ${
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
                         userType === "seller"
                           ? "bg-emerald-600 text-white shadow-xs"
                           : "bg-white text-slate-500 border border-slate-200"
@@ -445,12 +499,12 @@ export default function RegisterPage() {
                           {t({ bn: "সেলার (Seller)", en: "Seller" })}
                         </p>
                         {userType === "seller" && (
-                          <span className="grid h-4 w-4 place-items-center rounded-full bg-emerald-600 text-white">
-                            <Check className="h-3 w-3 stroke-[3]" />
+                          <span className="grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-600 text-white">
+                            <Check className="h-2.5 w-2.5 stroke-[3]" />
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate">
+                      <p className="text-[10px] text-slate-500 truncate">
                         {t({ bn: "প্রজেক্ট বিক্রয় ও শেয়ার", en: "Sell projects & shares" })}
                       </p>
                     </div>
@@ -459,14 +513,14 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={() => setUserType("buyer")}
-                    className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
+                    className={`flex items-center gap-2.5 rounded-xl border p-2 text-left transition ${
                       userType === "buyer"
                         ? "border-emerald-500 bg-emerald-50/80 shadow-xs ring-2 ring-emerald-500/20"
                         : "border-slate-200 bg-slate-50/60 hover:bg-slate-100/70"
                     }`}
                   >
                     <div
-                      className={`grid h-9 w-9 place-items-center rounded-xl transition ${
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
                         userType === "buyer"
                           ? "bg-emerald-600 text-white shadow-xs"
                           : "bg-white text-slate-500 border border-slate-200"
@@ -480,82 +534,73 @@ export default function RegisterPage() {
                           {t({ bn: "বায়ার (Buyer)", en: "Buyer" })}
                         </p>
                         {userType === "buyer" && (
-                          <span className="grid h-4 w-4 place-items-center rounded-full bg-emerald-600 text-white">
-                            <Check className="h-3 w-3 stroke-[3]" />
+                          <span className="grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-600 text-white">
+                            <Check className="h-2.5 w-2.5 stroke-[3]" />
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate">
+                      <p className="text-[10px] text-slate-500 truncate">
                         {t({ bn: "শেয়ার ক্রয় ও বিনিয়োগ", en: "Buy shares & invest" })}
                       </p>
                     </div>
                   </button>
                 </div>
 
-                {/* ══════════════ 2. ENTITY TYPE SELECTOR (INDIVIDUAL VS COMMUNITY VS ORGANISATION) ══════════════ */}
-                <div className="mt-4">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
-                    {t({
-                      bn: "উদ্যোক্তা / ইউজারের ধরন (Entity Type)",
-                      en: "Entity / User Type",
-                    })}{" "}
-                    <span className="text-rose-500">*</span>
-                  </label>
+                {/* 2. ENTITY TYPE SELECTOR */}
+                <div className="mt-2.5">
                   <div className="grid grid-cols-3 gap-2">
-                    {/* Individual */}
                     <button
                       type="button"
                       onClick={() => setEntityType("individual")}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition ${
+                      className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl border text-center transition ${
                         entityType === "individual"
                           ? "border-emerald-500 bg-emerald-50/90 text-emerald-900 shadow-xs ring-2 ring-emerald-500/20 font-bold"
                           : "border-slate-200 bg-slate-50/60 text-slate-700 hover:bg-slate-100/70 font-medium"
                       }`}
                     >
-                      <User className={`h-4 w-4 mb-1 ${entityType === "individual" ? "text-emerald-600" : "text-slate-400"}`} />
-                      <span className="text-xs leading-tight">
+                      <User className={`h-3.5 w-3.5 mb-0.5 ${entityType === "individual" ? "text-emerald-600" : "text-slate-400"}`} />
+                      <span className="text-[11px] leading-tight">
                         {t({ bn: "ইন্ডিভিজুয়াল", en: "Individual" })}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-normal">ব্যক্তিগত</span>
                     </button>
 
-                    {/* Community */}
                     <button
                       type="button"
                       onClick={() => setEntityType("community")}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition ${
+                      className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl border text-center transition ${
                         entityType === "community"
                           ? "border-emerald-500 bg-emerald-50/90 text-emerald-900 shadow-xs ring-2 ring-emerald-500/20 font-bold"
                           : "border-slate-200 bg-slate-50/60 text-slate-700 hover:bg-slate-100/70 font-medium"
                       }`}
                     >
-                      <Users className={`h-4 w-4 mb-1 ${entityType === "community" ? "text-emerald-600" : "text-slate-400"}`} />
-                      <span className="text-xs leading-tight">
+                      <Users className={`h-3.5 w-3.5 mb-0.5 ${entityType === "community" ? "text-emerald-600" : "text-slate-400"}`} />
+                      <span className="text-[11px] leading-tight">
                         {t({ bn: "কমিউনিটি", en: "Community" })}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-normal">সমবায় / ক্লাব</span>
                     </button>
 
-                    {/* Organisation */}
                     <button
                       type="button"
                       onClick={() => setEntityType("organisation")}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition ${
+                      className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl border text-center transition ${
                         entityType === "organisation"
                           ? "border-emerald-500 bg-emerald-50/90 text-emerald-900 shadow-xs ring-2 ring-emerald-500/20 font-bold"
                           : "border-slate-200 bg-slate-50/60 text-slate-700 hover:bg-slate-100/70 font-medium"
                       }`}
                     >
-                      <Building2 className={`h-4 w-4 mb-1 ${entityType === "organisation" ? "text-emerald-600" : "text-slate-400"}`} />
-                      <span className="text-xs leading-tight">
+                      <Building2 className={`h-3.5 w-3.5 mb-0.5 ${entityType === "organisation" ? "text-emerald-600" : "text-slate-400"}`} />
+                      <span className="text-[11px] leading-tight">
                         {t({ bn: "অর্গানাইজেশন", en: "Organisation" })}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-normal">কোম্পানি / ফার্ম</span>
                     </button>
                   </div>
                 </div>
+              </div>
 
-                <form onSubmit={submit} className="mt-4 space-y-4">
+              {/* FORM WITH SCROLLABLE MIDDLE & STATIC PINNED FOOTER */}
+              <form onSubmit={submit} className="flex flex-1 flex-col overflow-hidden">
+                {/* Scrollable Form Fields */}
+                <div className="flex-1 overflow-y-auto px-6 py-4 sm:px-10 space-y-4">
                   {/* Section 1: Basic Credentials */}
                   <div className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -787,7 +832,7 @@ export default function RegisterPage() {
                             disabled={isSubmitting}
                             value={communityName}
                             onChange={(e) => setCommunityName(e.target.value)}
-                            className={inputCls}
+                            className={inputNoIconCls}
                             placeholder="e.g. Dhaka Green Investors Club"
                           />
                         </div>
@@ -804,7 +849,7 @@ export default function RegisterPage() {
                             disabled={isSubmitting}
                             value={representativeName}
                             onChange={(e) => setRepresentativeName(e.target.value)}
-                            className={inputCls}
+                            className={inputNoIconCls}
                             placeholder="e.g. Rafiqul Islam"
                           />
                         </div>
@@ -823,7 +868,7 @@ export default function RegisterPage() {
                             disabled={isSubmitting}
                             value={communityDesignation}
                             onChange={(e) => setCommunityDesignation(e.target.value)}
-                            className={inputCls}
+                            className={inputNoIconCls}
                             placeholder="e.g. President / Secretary / Convener"
                           />
                         </div>
@@ -841,7 +886,7 @@ export default function RegisterPage() {
                             disabled={isSubmitting}
                             value={memberCount}
                             onChange={(e) => setMemberCount(e.target.value)}
-                            className={inputCls}
+                            className={inputNoIconCls}
                             placeholder="e.g. 50"
                           />
                         </div>
@@ -859,7 +904,7 @@ export default function RegisterPage() {
                             disabled={isSubmitting}
                             value={communityRegNo}
                             onChange={(e) => setCommunityRegNo(e.target.value)}
-                            className={inputCls}
+                            className={inputNoIconCls}
                             placeholder="e.g. REG-2024-987"
                           />
                         </div>
@@ -874,7 +919,7 @@ export default function RegisterPage() {
                             disabled={isSubmitting}
                             value={communityAddress}
                             onChange={(e) => setCommunityAddress(e.target.value)}
-                            className={inputCls}
+                            className={inputNoIconCls}
                             placeholder="e.g. Sector 4, Uttara, Dhaka"
                           />
                         </div>
@@ -907,7 +952,7 @@ export default function RegisterPage() {
                             disabled={isSubmitting}
                             value={companyName}
                             onChange={(e) => setCompanyName(e.target.value)}
-                            className={inputCls}
+                            className={inputNoIconCls}
                             placeholder="e.g. Apex Agrotech Limited"
                           />
                         </div>
@@ -920,7 +965,7 @@ export default function RegisterPage() {
                           <select
                             value={businessType}
                             onChange={(e) => setBusinessType(e.target.value)}
-                            className={inputCls}
+                            className={inputNoIconCls}
                           >
                             <option value="Private Limited Company">Private Limited Company (প্রাইভেট লিমিটেড)</option>
                             <option value="Public Limited Company">Public Limited Company (পাবলিক লিমিটেড)</option>
@@ -983,7 +1028,7 @@ export default function RegisterPage() {
                             disabled={isSubmitting}
                             value={signatoryDesignation}
                             onChange={(e) => setSignatoryDesignation(e.target.value)}
-                            className={inputCls}
+                            className={inputNoIconCls}
                             placeholder="e.g. Managing Director / CEO"
                           />
                         </div>
@@ -1142,10 +1187,18 @@ export default function RegisterPage() {
                     )}
                   </AnimatePresence>
 
+                </div>
+
+                {/* STATIC PINNED FOOTER */}
+                <div className="shrink-0 px-6 py-3.5 sm:px-10 sm:py-4 border-t border-slate-100 bg-white/95 backdrop-blur-xs shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.03)]">
                   <button
                     type="submit"
-                    disabled={isSubmitting}
-                    className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-ink-950 px-6 py-3.5 text-sm font-semibold text-white shadow-xl shadow-ink-950/20 transition hover:bg-ink-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={!isFormValid || isSubmitting}
+                    className={`group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl px-6 py-3 text-sm font-semibold transition active:scale-[0.99] ${
+                      !isFormValid || isSubmitting
+                        ? "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
+                        : "bg-ink-950 text-white shadow-xl shadow-ink-950/20 hover:bg-ink-800"
+                    }`}
                   >
                     <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-sky-500 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                     <span className="relative flex items-center gap-2">
@@ -1162,20 +1215,20 @@ export default function RegisterPage() {
                       )}
                     </span>
                   </button>
-                </form>
 
-                <p className="mt-4 text-center text-sm text-slate-500">
-                  {t({ bn: "ইতিমধ্যে অ্যাকাউন্ট আছে?", en: "Already have an account?" })}{" "}
-                  <Link
-                    href="/login"
-                    className="font-semibold text-emerald-600 hover:text-emerald-700"
-                  >
-                    {t({ bn: "লগইন করুন", en: "Sign in" })}
-                  </Link>
-                </p>
-              </>
-            )}
-          </div>
+                  <p className="mt-2 text-center text-xs text-slate-500">
+                    {t({ bn: "ইতিমধ্যে অ্যাকাউন্ট আছে?", en: "Already have an account?" })}{" "}
+                    <Link
+                      href="/login"
+                      className="font-semibold text-emerald-600 hover:text-emerald-700"
+                    >
+                      {t({ bn: "লগইন করুন", en: "Sign in" })}
+                    </Link>
+                  </p>
+                </div>
+              </form>
+            </>
+          )}
         </div>
       </motion.div>
     </div>

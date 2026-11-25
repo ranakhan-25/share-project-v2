@@ -22,6 +22,7 @@ import {
 import { useLang } from "@/lib/i18n";
 import { PageHero } from "@/components/site/sections/PageHero";
 import { ShareProjectModal } from "@/components/share/ShareProjectModal";
+import { getProjectDefaultImage } from "@/lib/project-defaults";
 import type { OwnerProject } from "@/lib/owner-projects";
 import type { InvestorProject } from "@/data/investorProjects";
 
@@ -107,7 +108,7 @@ export default function ProjectsPage() {
 
   const publishedProjects: InvestorProject[] = useMemo(
     () =>
-      ownerPublished.map((project) => ({
+      ownerPublished.map((project, idx) => ({
         id: project.id,
         name: { bn: project.name, en: project.name },
         location: { bn: project.location, en: project.location },
@@ -115,7 +116,7 @@ export default function ProjectsPage() {
         status: "funding",
         image:
           project.thumbnail ||
-          "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=85",
+          getProjectDefaultImage(project.category, idx),
         pricePerShare: project.pricePerShare,
         totalShares: project.totalShares,
         soldShares: 0,
@@ -481,13 +482,29 @@ export default function ProjectsPage() {
                           />
                         </div>
                       </div>
-                      <Link
-                        href={`/projects/${project.id}`}
-                        className="mt-5 flex items-center justify-between rounded-2xl bg-ink-950 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
-                      >
-                        {t({ bn: "বিস্তারিত দেখুন", en: "View details" })}
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
+                      <div className="mt-5 flex items-center gap-2">
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className="flex flex-1 items-center justify-between rounded-2xl bg-ink-950 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                        >
+                          {t({ bn: "বিস্তারিত দেখুন", en: "View details" })}
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSharingProject({
+                              id: project.id,
+                              name: t(project.name),
+                              location: t(project.location),
+                            })
+                          }
+                          title={t({ bn: "প্রজেক্ট শেয়ার করুন", en: "Share project" })}
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 shadow-xs transition cursor-pointer"
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   </article>
                 );

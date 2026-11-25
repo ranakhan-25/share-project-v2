@@ -14,6 +14,7 @@ import {
   PieChart,
   Quote,
   Repeat2,
+  Share2,
   ShieldCheck,
   Sparkles,
   Star,
@@ -24,6 +25,8 @@ import { useLang, type Bi } from "@/lib/i18n";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { CountUp } from "@/components/ui/CountUp";
+import { ShareProjectModal } from "@/components/share/ShareProjectModal";
+import { getProjectDefaultImage } from "@/lib/project-defaults";
 
 /* ─────────────── 1. How it works ─────────────── */
 export function HowItWorks() {
@@ -126,6 +129,7 @@ export function FeaturedProjects() {
 
   const [projects, setProjects] = useState<FeaturedProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sharingProject, setSharingProject] = useState<{ id: string; name: string; location?: string } | null>(null);
 
   useEffect(() => {
     const API_BASE =
@@ -195,22 +199,26 @@ export function FeaturedProjects() {
               : [];
 
         const rows: FeaturedProject[] = data
-          .map((p: Record<string, any>) => ({
-            id: String(p.uuid || p.id || ""),
-            name: String(p.name || p.title || ""),
-            location: String(p.location || p.address || ""),
-            category: String(
+          .map((p: Record<string, any>, idx: number) => {
+            const cat = String(
               typeof p.category === "object"
                 ? p.category?.name || ""
                 : p.category || "",
-            ),
-            thumbnail: getImageUrl(p),
-            pricePerShare: Number(p.pricePerShare || 0),
-            expectedAnnualReturn: Number(
-              p.expectedAnnualReturn || 0,
-            ),
-            totalShares: Number(p.totalShares || 0),
-          }))
+            );
+            const rawThumb = getImageUrl(p);
+            return {
+              id: String(p.uuid || p.id || ""),
+              name: String(p.name || p.title || ""),
+              location: String(p.location || p.address || ""),
+              category: cat,
+              thumbnail: rawThumb || getProjectDefaultImage(cat, idx),
+              pricePerShare: Number(p.pricePerShare || 0),
+              expectedAnnualReturn: Number(
+                p.expectedAnnualReturn || 0,
+              ),
+              totalShares: Number(p.totalShares || 0),
+            };
+          })
           .filter((p: FeaturedProject) => p.id && p.name)
           .slice(0, 6);
 
@@ -290,40 +298,44 @@ export function FeaturedProjects() {
 
                   {/* Project Thumbnail */}
                   <div className="relative h-52 overflow-hidden bg-slate-200">
-
-                    {p.thumbnail ? (
-                      <img
-                        src={p.thumbnail || "/image.png"}
-                        alt={p.name}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        onError={(e) => {
-                          console.error(
-                            "Project image failed:",
-                            p.thumbnail,
-                          );
-
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                        No Image Available
-                      </div>
-                    )}
+                    <img
+                      src={p.thumbnail || getProjectDefaultImage(p.category, i)}
+                      alt={p.name}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      onError={(e) => {
+                        e.currentTarget.src = getProjectDefaultImage(p.category, i);
+                      }}
+                    />
 
                     {/* Category */}
                     {p.category && (
-                      <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 backdrop-blur">
+                      <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 backdrop-blur shadow-xs">
                         {p.category}
                       </span>
                     )}
 
+                    {/* Share Button on Image */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setSharingProject({
+                          id: p.id,
+                          name: p.name,
+                          location: p.location,
+                        });
+                      }}
+                      title={t({ bn: "প্রজেক্ট শেয়ার করুন", en: "Share project" })}
+                      className="absolute right-4 top-4 z-10 grid h-8.5 w-8.5 place-items-center rounded-full bg-white/90 backdrop-blur-md text-slate-700 hover:bg-white hover:text-emerald-600 shadow-sm transition cursor-pointer"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </button>
+
                     {/* Annual Return */}
                     {p.expectedAnnualReturn > 0 && (
-                      <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-white">
+                      <span className="absolute right-4 bottom-4 inline-flex items-center gap-1 rounded-full bg-emerald-500/95 backdrop-blur-xs px-3 py-1 text-xs font-bold text-white shadow-xs">
                         <Sparkles className="h-3 w-3" />
-
                         {num(p.expectedAnnualReturn)}%{" "}
                         {t({
                           bn: "রিটার্ন",
@@ -335,14 +347,13 @@ export function FeaturedProjects() {
 
                   {/* Project Information */}
                   <div className="p-6">
-
-                    <h3 className="text-xl font-bold text-slate-900">
+                    <h3 className="text-xl font-bold text-slate-900 line-clamp-1">
                       {p.name}
                     </h3>
 
                     {p.location && (
-                      <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500">
-                        <MapPin className="h-4 w-4" />
+                      <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500 line-clamp-1">
+                        <MapPin className="h-4 w-4 shrink-0" />
                         {p.location}
                       </p>
                     )}
@@ -373,17 +384,31 @@ export function FeaturedProjects() {
                       )}
                     </div>
 
-                    {/* Details Button */}
-                    <div className="mt-6 flex gap-3">
+                    {/* Details & Share Buttons */}
+                    <div className="mt-6 flex items-center gap-2">
                       <Link
                         href={`/projects/${p.id}`}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-800 transition hover:border-sky-500 hover:bg-sky-500 hover:text-white"
+                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-800 transition hover:border-emerald-600 hover:bg-emerald-600 hover:text-white"
                       >
                         {t({
                           bn: "বিস্তারিত দেখুন",
                           en: "View details",
                         })}
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSharingProject({
+                            id: p.id,
+                            name: p.name,
+                            location: p.location,
+                          })
+                        }
+                        title={t({ bn: "প্রজেক্ট শেয়ার করুন", en: "Share project" })}
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer shadow-2xs"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 </article>
@@ -413,6 +438,13 @@ export function FeaturedProjects() {
           )}
         </div>
       </div>
+
+      {/* Share Project Modal */}
+      <ShareProjectModal
+        open={!!sharingProject}
+        onClose={() => setSharingProject(null)}
+        project={sharingProject}
+      />
     </section>
   );
 }
