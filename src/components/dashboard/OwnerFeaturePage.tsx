@@ -12,9 +12,11 @@ import {
   Clock3,
   Edit3,
   Eye,
+  EyeOff,
   FileText,
   Filter,
   FolderKanban,
+  Globe,
   ImageIcon,
   LayoutGrid,
   List,
@@ -22,7 +24,9 @@ import {
   Plus,
   Search,
   Send,
+  Trash2,
   UserRound,
+  Users,
   AlertCircle,
   TrendingUp,
   Layers,
@@ -31,6 +35,7 @@ import {
   Lock,
 } from "lucide-react";
 import { getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import { getProjectDefaultImage } from "@/lib/project-defaults";
 import {
   statusLabel,
   type OwnerProject,
@@ -43,6 +48,10 @@ import {
   resubmitOwnerProject,
   submitOwnerProject,
   updateOwnerProject,
+  requestPublishOwnerProject,
+  unpublishOwnerProject,
+  deleteOwnerProject,
+  getOwnerProjectInvestors,
   getShareUserProfile,
   updateShareUserProfile,
   type ShareApiProject,
@@ -86,8 +95,10 @@ const statusClasses: Record<OwnerProjectStatus, string> = {
   draft: "bg-slate-100 text-slate-700 border border-slate-200",
   pending: "bg-amber-50 text-amber-700 border border-amber-200/60",
   approved: "bg-sky-50 text-sky-700 border border-sky-200/60",
-  rejected: "bg-rose-50 text-rose-700 border border-rose-200/60",
+  publish_requested: "bg-purple-50 text-purple-700 border border-purple-200/60",
   published: "bg-emerald-50 text-emerald-700 border border-emerald-200/60",
+  unpublished: "bg-amber-50 text-amber-700 border border-amber-200/60",
+  rejected: "bg-rose-50 text-rose-700 border border-rose-200/60",
 };
 
 function StatusBadge({ status }: { status: OwnerProjectStatus }) {
@@ -146,6 +157,57 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState(emptyProject);
+  const [projectInvestors, setProjectInvestors] = useState<any[]>([]);
+  const [investorsLoading, setInvestorsLoading] = useState(false);
+
+  const reloadProjects = async () => {
+    const projectBody = await getOwnerProjects(undefined, 1, 100).catch(() => ({ data: [] }));
+    const rows = Array.isArray(projectBody.data) ? projectBody.data : [];
+    const mapped = rows.map((row: ShareApiProject): OwnerProject => ({
+      id: row.uuid,
+      name: row.name,
+      category: row.category?.name || "",
+      description: row.description,
+      location: row.location || "",
+      thumbnail: row.thumbnailUrl || "",
+      gallery: (row.images || []).map((image) => image.url),
+      documents: (row.documents || []).map((document) => document.title || document.url),
+      totalInvestmentAmount: Number(row.totalInvestmentAmount || 0),
+      totalShares: Number(row.totalShares || 0),
+      pricePerShare: Number(row.pricePerShare || 0),
+      minimumInvestment: Number(row.minimumInvestment || 0),
+      expectedAnnualReturn: Number(row.expectedAnnualReturn || 0),
+      startDate: row.startDate || "",
+      endDate: row.endDate || "",
+      status: row.status.toLowerCase() as OwnerProjectStatus,
+      rejectionReason: row.rejectionReason || undefined,
+      createdAt: "",
+      updatedAt: "",
+      investorCount: Array.isArray((row as any).investments) ? (row as any).investments.length : 0,
+      submissionHistory: (row.submissions || []).map((item) => ({
+        status: "pending" as OwnerProjectStatus,
+        note: item.type === "resubmission" ? "Rejected project resubmitted." : "Project submitted for approval.",
+        date: item.createdAt || item.submittedAt || "",
+      })),
+    }));
+    setProjects(mapped);
+    return mapped;
+  };
+
+  useEffect(() => {
+    if (feature === "detail" && projectId) {
+      setInvestorsLoading(true);
+      getOwnerProjectInvestors(projectId)
+        .then((data) => {
+          setProjectInvestors(data || []);
+        })
+        .catch((err) => {
+          console.warn("Failed to load investors for project", err);
+          setProjectInvestors([]);
+        })
+        .finally(() => setInvestorsLoading(false));
+    }
+  }, [feature, projectId]);
 
   useEffect(() => {
     setLoading(true);
@@ -175,6 +237,7 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
         rejectionReason: row.rejectionReason || undefined,
         createdAt: "",
         updatedAt: "",
+        investorCount: Array.isArray((row as any).investments) ? (row as any).investments.length : 0,
         submissionHistory: (row.submissions || []).map((item) => ({
           status: "pending" as OwnerProjectStatus,
           note: item.type === "resubmission" ? "Rejected project resubmitted." : "Project submitted for approval.",
@@ -318,15 +381,7 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
       ? (project.status === "rejected" ? resubmitOwnerProject(project.id) : submitOwnerProject(project.id))
       : Promise.reject(new Error("This status transition is managed by Admin"))
     ).then(async () => {
-      const reloaded = await getOwnerProjects(undefined, 1, 100).catch(() => ({ data: [] }));
-      const updated = (reloaded.data || []).map((row: ShareApiProject): OwnerProject => ({
-        ...project,
-        id: row.uuid,
-        name: row.name,
-        status: row.status.toLowerCase() as OwnerProjectStatus,
-        rejectionReason: row.rejectionReason || undefined,
-      }));
-      setProjects(updated);
+      await reloadProjects();
       setMessage(`Project moved to ${statusLabel(nextStatus)}.`);
       toast.success(`Project moved to ${statusLabel(nextStatus)}.`);
     }).catch((cause) => {
@@ -334,6 +389,63 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
       setError(message);
       toast.error(message);
     });
+  }
+
+  async function handlePublishRequest(project: OwnerProject) {
+    if (!window.confirm(`এডমিনের কাছে "${project.name}" প্রজেক্টটির পাবলিশ রিকোয়েস্ট পাঠাতে চান?`)) return;
+    setSaving(true);
+    try {
+      await requestPublishOwnerProject(project.id);
+      toast.success("পাবলিশ রিকোয়েস্ট সফলভাবে পাঠানো হয়েছে। এডমিন এপ্রুভ করলে এটি লাইভ হবে।");
+      await reloadProjects();
+    } catch (cause: any) {
+      const msg = cause?.message || "পাবলিশ রিকোয়েস্ট পাঠানো সম্ভব হয়নি।";
+      toast.error(msg);
+      setError(msg);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUnpublish(project: OwnerProject) {
+    if (!window.confirm(`"${project.name}" প্রজেক্টটি আনপাবলিশ করতে চান? আনপাবলিশ করার পর আপনি এটি এডিট করতে পারবেন।`)) return;
+    setSaving(true);
+    try {
+      await unpublishOwnerProject(project.id);
+      toast.success("প্রজেক্টটি আনপাবলিশ করা হয়েছে। এখন আপনি এটি এডিট করতে পারবেন।");
+      await reloadProjects();
+    } catch (cause: any) {
+      const msg = cause?.message || "আনপাবলিশ করা সম্ভব হয়নি।";
+      toast.error(msg);
+      setError(msg);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(project: OwnerProject) {
+    if ((project.investorCount && project.investorCount > 0) || (projectInvestors.length > 0 && selectedProject?.id === project.id)) {
+      alert("এই প্রজেক্টে বায়ারের ইনভেস্টমেন্ট তথ্য রয়েছে, তাই এটি ডিলেট করা যাবে না।");
+      toast.error("এই প্রজেক্টে বায়ারের ইনভেস্টমেন্ট তথ্য রয়েছে, তাই এটি ডিলেট করা যাবে না।");
+      return;
+    }
+    if (!window.confirm(`আপনি কি নিশ্চিত যে "${project.name}" প্রজেক্টটি মুছে ফেলতে চান?`)) return;
+    setSaving(true);
+    try {
+      await deleteOwnerProject(project.id);
+      toast.success("প্রজেক্টটি সফলভাবে মুছে ফেলা হয়েছে।");
+      await reloadProjects();
+      if (feature === "detail") {
+        window.location.href = "/dashboard/owner";
+      }
+    } catch (cause: any) {
+      const msg = cause?.message || "প্রজেক্টটি ডিলেট করা সম্ভব হয়নি।";
+      alert(msg);
+      toast.error(msg);
+      setError(msg);
+    } finally {
+      setSaving(false);
+    }
   }
 
   // Access restriction for buyers
@@ -400,8 +512,18 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
           <ArrowLeft className="h-4 w-4" />Back to Seller Portal
         </Link>
         <div className={`${card} overflow-hidden`}>
-          <div className="relative h-60 sm:h-80 bg-slate-100">
-            {project.thumbnail && <Image src={project.thumbnail} alt={project.name} fill sizes="100vw" className="object-cover" />}
+          <div className="relative h-60 sm:h-80 bg-slate-100 overflow-hidden">
+            <Image
+              src={project.thumbnail || getProjectDefaultImage(project.category)}
+              alt={project.name}
+              fill
+              sizes="100vw"
+              className="object-cover"
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                target.src = getProjectDefaultImage(project.category);
+              }}
+            />
           </div>
           <div className="p-6 sm:p-8">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -412,7 +534,7 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                   <MapPin className="h-4 w-4 text-slate-400" />{project.location}
                 </p>
               </div>
-              {(project.status === "draft" || project.status === "rejected") && (
+              {(project.status === "draft" || project.status === "rejected" || project.status === "unpublished") && (
                 <Link href={`/dashboard/owner/projects/${project.id}/edit`} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-all">
                   <Edit3 className="h-4 w-4" />Edit Project
                 </Link>
@@ -438,16 +560,141 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                 </div>
               ))}
             </div>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               {project.status === "draft" && (
-                <button onClick={() => changeStatus(project, "pending")} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => changeStatus(project, "pending")}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50"
+                >
                   <Send className="h-4 w-4" />Submit for Approval
                 </button>
               )}
               {project.status === "rejected" && (
-                <button onClick={() => changeStatus(project, "pending")} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => changeStatus(project, "pending")}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50"
+                >
                   <Send className="h-4 w-4" />Resubmit Project
                 </button>
+              )}
+              {(project.status === "approved" || project.status === "unpublished") && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handlePublishRequest(project)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50"
+                >
+                  <Globe className="h-4 w-4" />Publish Request (পাবলিশ রিকোয়েস্ট পাঠান)
+                </button>
+              )}
+              {project.status === "published" && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleUnpublish(project)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-xs font-semibold text-amber-800 shadow-sm hover:bg-amber-100 transition-all disabled:opacity-50"
+                >
+                  <EyeOff className="h-4 w-4" />Unpublish (আনপাবলিশ করুন)
+                </button>
+              )}
+              {(project.status === "draft" || project.status === "pending" || project.status === "rejected" || project.status === "unpublished") && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleDelete(project)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-100 transition-all disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />Delete Project
+                </button>
+              )}
+            </div>
+
+            {/* Interested Investors Section (approved by Admin) */}
+            <div className="mt-8 border-t border-slate-100 pt-6">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-indigo-600" />
+                  <h2 className="text-base font-bold text-slate-900">
+                    ইন্টারেস্টেড ইনভেস্টরস (Interested Investors)
+                  </h2>
+                </div>
+                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 border border-indigo-200/50">
+                  {projectInvestors.length} জন অনুমোদিত বায়ার
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">
+                যেসব বায়ার এই প্রজেক্টে ইনভেস্ট করার রিকোয়েস্ট দিয়েছেন এবং এডমিন কর্তৃক অনুমোদিত হয়েছেন তাদের তালিকা:
+              </p>
+
+              {investorsLoading ? (
+                <div className="py-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-indigo-600" /> ইনভেস্টরদের তথ্য লোড হচ্ছে...
+                </div>
+              ) : projectInvestors.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center text-xs text-slate-500">
+                  <Users className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                  এখনও কোনো বায়ারের অনুমোদিত ইনভেস্টমেন্ট নেই। বায়াররা ইনভেস্ট রিকোয়েস্ট পাঠালে এবং এডমিন অনুমোদন দিলে এখানে তাদের তথ্য দেখা যাবে।
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead className="bg-slate-50 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3">বায়ার নাম</th>
+                        <th className="px-4 py-3">মোবাইল ও ইমেইল</th>
+                        <th className="px-4 py-3">শেয়ার সংখ্যা</th>
+                        <th className="px-4 py-3">মোট বিনিয়োগ</th>
+                        <th className="px-4 py-3">স্ট্যাটাস</th>
+                        <th className="px-4 py-3">তারিখ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {projectInvestors.map((inv, idx) => {
+                        const u = inv.user || {};
+                        const buyerName = u.name || inv.investorName || "বায়ার";
+                        const buyerEmail = u.email || inv.investorEmail || "-";
+                        const buyerPhone = u.phone || inv.investorPhone || "-";
+                        const shares = inv.shares || inv.quantity || 1;
+                        const amount = Number(inv.amount || inv.totalAmount || 0);
+                        const date = inv.approvedAt || inv.createdAt;
+                        return (
+                          <tr key={inv.uuid || inv.id || idx} className="hover:bg-indigo-50/30 transition">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 font-bold grid place-items-center text-xs shrink-0">
+                                  {buyerName.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="font-bold text-slate-900">{buyerName}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              <p className="font-medium text-slate-800">{buyerPhone}</p>
+                              <p className="text-[10px] text-slate-400">{buyerEmail}</p>
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-slate-800">
+                              {shares} টি শেয়ার
+                            </td>
+                            <td className="px-4 py-3 font-bold text-emerald-600">
+                              ৳{amount.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200/60">
+                                <CheckCircle2 className="h-3 w-3" /> অনুমোদিত
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 text-[11px]">
+                              {date ? new Date(date).toLocaleDateString("bn-BD") : "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
@@ -462,8 +709,10 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
     draft: projects.filter((p) => p.status === "draft").length,
     pending: projects.filter((p) => p.status === "pending").length,
     approved: projects.filter((p) => p.status === "approved").length,
-    rejected: projects.filter((p) => p.status === "rejected").length,
+    publish_requested: projects.filter((p) => p.status === "publish_requested").length,
     published: projects.filter((p) => p.status === "published").length,
+    unpublished: projects.filter((p) => p.status === "unpublished").length,
+    rejected: projects.filter((p) => p.status === "rejected").length,
   };
 
   // UNIFIED SINGLE-PAGE OWNER PORTAL
@@ -500,14 +749,16 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
       </header>
 
       {/* 2. Interactive Metric Overview Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
         {[
-          { key: "all", label: "All Projects", count: counts.all, bg: "from-slate-500/10 to-slate-500/5", color: "text-slate-800" },
-          { key: "draft", label: "Draft", count: counts.draft, bg: "from-slate-500/10 to-slate-500/5", color: "text-slate-600" },
-          { key: "pending", label: "Pending", count: counts.pending, bg: "from-amber-500/10 to-amber-500/5", color: "text-amber-700" },
-          { key: "approved", label: "Approved", count: counts.approved, bg: "from-sky-500/10 to-sky-500/5", color: "text-sky-700" },
-          { key: "rejected", label: "Rejected", count: counts.rejected, bg: "from-rose-500/10 to-rose-500/5", color: "text-rose-700" },
-          { key: "published", label: "Published", count: counts.published, bg: "from-emerald-500/10 to-emerald-500/5", color: "text-emerald-700" },
+          { key: "all", label: "All Projects", count: counts.all, color: "text-slate-800" },
+          { key: "draft", label: "Draft", count: counts.draft, color: "text-slate-600" },
+          { key: "pending", label: "Pending", count: counts.pending, color: "text-amber-700" },
+          { key: "approved", label: "Approved", count: counts.approved, color: "text-sky-700" },
+          { key: "publish_requested", label: "Req Publish", count: counts.publish_requested, color: "text-purple-700" },
+          { key: "published", label: "Published", count: counts.published, color: "text-emerald-700" },
+          { key: "unpublished", label: "Unpublished", count: counts.unpublished, color: "text-orange-700" },
+          { key: "rejected", label: "Rejected", count: counts.rejected, color: "text-rose-700" },
         ].map((item) => {
           const isActive = activeFilter === item.key;
           return (
@@ -515,16 +766,16 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
               key={item.key}
               type="button"
               onClick={() => setActiveFilter(item.key)}
-              className={`rounded-2xl border p-4 text-left transition-all ${
+              className={`rounded-2xl border p-3.5 text-left transition-all ${
                 isActive
                   ? "border-indigo-500 bg-white ring-2 ring-indigo-100 shadow-md scale-[1.02]"
                   : "border-slate-200/90 bg-white hover:border-indigo-200 hover:shadow-sm"
               }`}
             >
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate">
                 {item.label}
               </p>
-              <p className={`mt-2 text-2xl font-bold ${item.color}`}>
+              <p className={`mt-1.5 text-xl font-bold ${item.color}`}>
                 {item.count}
               </p>
             </button>
@@ -548,8 +799,10 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
             <option value="draft">Draft Projects</option>
             <option value="pending">Pending Projects</option>
             <option value="approved">Approved Projects</option>
-            <option value="rejected">Rejected Projects</option>
+            <option value="publish_requested">Requested for Publish</option>
             <option value="published">Published Projects</option>
+            <option value="unpublished">Unpublished Projects</option>
+            <option value="rejected">Rejected Projects</option>
             <option value="history">Submission History</option>
             <option value="profile">Profile Settings</option>
           </select>
@@ -748,7 +1001,7 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                           >
                             <Eye className="h-4 w-4" />
                           </Link>
-                          {(project.status === "draft" || project.status === "rejected") && (
+                          {(project.status === "draft" || project.status === "rejected" || project.status === "unpublished") && (
                             <Link
                               href={`/dashboard/owner/projects/${project.id}/edit`}
                               className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 transition-colors"
@@ -777,6 +1030,36 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                               <Send className="h-4 w-4" />
                             </button>
                           )}
+                          {(project.status === "approved" || project.status === "unpublished") && (
+                            <button
+                              type="button"
+                              onClick={() => handlePublishRequest(project)}
+                              className="rounded-lg p-1.5 text-purple-600 hover:bg-purple-50 transition-colors"
+                              title="Publish Request (পাবলিশ রিকোয়েস্ট পাঠান)"
+                            >
+                              <Globe className="h-4 w-4" />
+                            </button>
+                          )}
+                          {project.status === "published" && (
+                            <button
+                              type="button"
+                              onClick={() => handleUnpublish(project)}
+                              className="rounded-lg p-1.5 text-amber-600 hover:bg-amber-50 transition-colors"
+                              title="Unpublish (আনপাবলিশ করুন)"
+                            >
+                              <EyeOff className="h-4 w-4" />
+                            </button>
+                          )}
+                          {(project.status === "draft" || project.status === "pending" || project.status === "rejected" || project.status === "unpublished") && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(project)}
+                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 transition-colors"
+                              title="Delete Project"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -792,14 +1075,18 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                   key={project.id}
                   className="rounded-xl border border-slate-200/90 bg-white overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col"
                 >
-                  <div className="relative h-44 bg-slate-100">
-                    {project.thumbnail ? (
-                      <Image src={project.thumbnail} alt={project.name} fill sizes="300px" className="object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-slate-400">
-                        <Building2 className="h-8 w-8" />
-                      </div>
-                    )}
+                  <div className="relative h-44 bg-slate-100 overflow-hidden">
+                    <Image
+                      src={project.thumbnail || getProjectDefaultImage(project.category)}
+                      alt={project.name}
+                      fill
+                      sizes="300px"
+                      className="object-cover"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.src = getProjectDefaultImage(project.category);
+                      }}
+                    />
                     <div className="absolute top-3 right-3">
                       <StatusBadge status={project.status} />
                     </div>
@@ -835,7 +1122,7 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                         View Details <ChevronRight className="h-3 w-3" />
                       </Link>
                       <div className="flex items-center gap-1">
-                        {(project.status === "draft" || project.status === "rejected") && (
+                        {(project.status === "draft" || project.status === "rejected" || project.status === "unpublished") && (
                           <Link
                             href={`/dashboard/owner/projects/${project.id}/edit`}
                             className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100"
@@ -844,7 +1131,7 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                             <Edit3 className="h-3.5 w-3.5" />
                           </Link>
                         )}
-                        {(project.status === "draft" || project.status === "rejected") && (
+                        {project.status === "draft" && (
                           <button
                             type="button"
                             onClick={() => changeStatus(project, "pending")}
@@ -852,6 +1139,46 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                             title="Submit"
                           >
                             <Send className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {project.status === "rejected" && (
+                          <button
+                            type="button"
+                            onClick={() => changeStatus(project, "pending")}
+                            className="rounded-lg p-1.5 text-amber-600 hover:bg-amber-50"
+                            title="Resubmit"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {(project.status === "approved" || project.status === "unpublished") && (
+                          <button
+                            type="button"
+                            onClick={() => handlePublishRequest(project)}
+                            className="rounded-lg p-1.5 text-purple-600 hover:bg-purple-50"
+                            title="Publish Request"
+                          >
+                            <Globe className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {project.status === "published" && (
+                          <button
+                            type="button"
+                            onClick={() => handleUnpublish(project)}
+                            className="rounded-lg p-1.5 text-amber-600 hover:bg-amber-50"
+                            title="Unpublish"
+                          >
+                            <EyeOff className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {(project.status === "draft" || project.status === "pending" || project.status === "rejected" || project.status === "unpublished") && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(project)}
+                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>

@@ -48,9 +48,9 @@ import {
   type ShareApiProject,
 } from "@/lib/share-project-api";
 import { ShareProjectModal } from "@/components/share/ShareProjectModal";
+import { getProjectDefaultImage } from "@/lib/project-defaults";
 
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=900&q=80";
+const FALLBACK_IMAGE = getProjectDefaultImage();
 
 type ProjectItem = ShareApiProject & {
   categoryName?: string;
@@ -97,7 +97,7 @@ export default function AllProjectsDashboardPage() {
         const mapped: ProjectItem[] = rawList.map((p: any) => ({
           ...p,
           categoryName: p.category?.name || "General",
-          displayImage: p.thumbnailUrl || p.images?.[0]?.url || FALLBACK_IMAGE,
+          displayImage: p.thumbnailUrl || p.images?.[0]?.url || getProjectDefaultImage(p.category?.name),
         }));
         setProjects(mapped);
         setCategories(catRes || []);
@@ -107,7 +107,7 @@ export default function AllProjectsDashboardPage() {
           const compMapped: ProjectItem[] = compRes.map((p: any) => ({
             ...p,
             categoryName: p.category?.name || "General",
-            displayImage: p.thumbnailUrl || p.images?.[0]?.url || FALLBACK_IMAGE,
+            displayImage: p.thumbnailUrl || p.images?.[0]?.url || getProjectDefaultImage(p.category?.name),
           }));
           setCompareList(compMapped);
         }
@@ -178,7 +178,7 @@ export default function AllProjectsDashboardPage() {
         const synced: ProjectItem[] = res.list.map((p: any) => ({
           ...p,
           categoryName: p.category?.name || "General",
-          displayImage: p.thumbnailUrl || p.images?.[0]?.url || FALLBACK_IMAGE,
+          displayImage: p.thumbnailUrl || p.images?.[0]?.url || getProjectDefaultImage(p.category?.name),
         }));
         setCompareList(synced);
       }

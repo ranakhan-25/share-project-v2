@@ -84,6 +84,38 @@ export async function getOwnerSubmissionHistory(uuid: string) {
   return unwrap<unknown[]>(response.data);
 }
 
+export async function requestPublishOwnerProject(uuid: string) {
+  const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/publish-request`, {});
+  return unwrap<Record<string, unknown>>(response.data);
+}
+
+export async function unpublishOwnerProject(uuid: string) {
+  const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/unpublish`, {});
+  return unwrap<Record<string, unknown>>(response.data);
+}
+
+export async function deleteOwnerProject(uuid: string) {
+  const response = await api.delete(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}`);
+  return unwrap<{ success?: boolean; message?: string }>(response.data);
+}
+
+export async function getOwnerProjectInvestors(uuid: string) {
+  const response = await api.get(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/investors`);
+  return unwrap<Array<{
+    id?: number | string;
+    uuid?: string;
+    code?: string;
+    investorName?: string;
+    investorEmail?: string;
+    investorPhone?: string;
+    quantity?: number;
+    totalAmount?: number | string;
+    status?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }>>(response.data);
+}
+
 export async function getShareUserProfile() {
   const response = await api.get("/realbizpro/api/v1/share-user/profile");
   return unwrap<Record<string, unknown>>(response.data);

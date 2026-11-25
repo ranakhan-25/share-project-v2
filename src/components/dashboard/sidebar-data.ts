@@ -2,6 +2,7 @@ import {
   Building2,
   FolderKanban,
   LayoutDashboard,
+  Settings,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -33,6 +34,7 @@ export const sidebarMenu: MenuGroup[] = [
     items: [
       { label: { bn: "ড্যাশবোর্ড", en: "Dashboard" }, href: "/dashboard", icon: LayoutDashboard },
       { label: { bn: "সব প্রজেক্ট", en: "All Projects" }, href: "/dashboard/projects", icon: Building2 },
+      { label: { bn: "প্ল্যাটফর্ম সেটিংস", en: "Platform Settings" }, href: "/dashboard/settings", icon: Settings },
     ],
   },
 

@@ -26,6 +26,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Settings,
   ShieldCheck,
   Trash2,
   UserCheck,
@@ -87,13 +88,15 @@ import { useLang } from "@/lib/i18n";
 import { Navbar } from "@/components/site/Navbar";
 import { LogoMark } from "@/components/site/Logo";
 import { ProjectDetailContent } from "@/components/admin/ProjectDetailContent";
+import { AdminProjectImageSettings } from "@/components/admin/AdminProjectImageSettings";
 
-type SidebarMenuKey = "dashboard" | "projects" | "investments" | "users" | "categories";
+type SidebarMenuKey = "dashboard" | "projects" | "investments" | "users" | "categories" | "settings";
 
 type ProjectFilterStatus =
   | "all"
   | "pending"
   | "approved"
+  | "publish_requested"
   | "published"
   | "rejected"
   | "unpublished"
@@ -664,6 +667,10 @@ export default function ShareProjectAdminDashboardPage() {
     () => projects.filter((p) => String(p.status || "").toLowerCase() === "published").length,
     [projects],
   );
+  const publishRequestedCount = useMemo(
+    () => projects.filter((p) => String(p.status || "").toLowerCase() === "publish_requested").length,
+    [projects],
+  );
   const rejectedCount = useMemo(
     () => projects.filter((p) => String(p.status || "").toLowerCase() === "rejected").length,
     [projects],
@@ -677,7 +684,7 @@ export default function ShareProjectAdminDashboardPage() {
   const filteredProjects = useMemo(() => {
     let list = projectStatusFilter === "trash" ? trashProjects : projects;
 
-    if (["pending", "approved", "published", "rejected", "unpublished"].includes(projectStatusFilter)) {
+    if (["pending", "approved", "publish_requested", "published", "rejected", "unpublished"].includes(projectStatusFilter)) {
       list = list.filter((p) => String(p.status || "").toLowerCase() === projectStatusFilter);
     }
 
@@ -769,10 +776,11 @@ export default function ShareProjectAdminDashboardPage() {
   const projectStatusChartData = useMemo(() => [
     { name: "Published", count: publishedCount, fill: "#0ea5e9" },
     { name: "Approved", count: approvedCount, fill: "#10b981" },
+    { name: "Req Publish", count: publishRequestedCount, fill: "#8b5cf6" },
     { name: "Pending", count: pendingCount, fill: "#f59e0b" },
     { name: "Rejected", count: rejectedCount, fill: "#f43f5e" },
     { name: "Unpub", count: unpublishedCount, fill: "#64748b" },
-  ], [publishedCount, approvedCount, pendingCount, rejectedCount, unpublishedCount]);
+  ], [publishedCount, approvedCount, publishRequestedCount, pendingCount, rejectedCount, unpublishedCount]);
 
   // Sidebar Menu Items - Exactly as requested: Dashboard, All Project, Share User, Category (+ Investments)
   const sidebarItems: Array<{
@@ -786,6 +794,7 @@ export default function ShareProjectAdminDashboardPage() {
     { key: "investments", label: "Investments", icon: Landmark, count: investments.length },
     { key: "users", label: "Share User", icon: Users, count: users.length },
     { key: "categories", label: "Category", icon: FolderClosed, count: categories.length },
+    { key: "settings", label: "Settings", icon: Settings },
   ];
 
   // Filtering tabs inside "All Project" page for all the sub-statuses from the user's screenshot
@@ -793,6 +802,7 @@ export default function ShareProjectAdminDashboardPage() {
     { key: "all", label: "All Projects", count: projects.length },
     { key: "pending", label: "Pending", count: pendingCount },
     { key: "approved", label: "Approved", count: approvedCount },
+    { key: "publish_requested", label: "Requested For Publish", count: publishRequestedCount },
     { key: "published", label: "Published", count: publishedCount },
     { key: "rejected", label: "Rejected", count: rejectedCount },
     { key: "unpublished", label: "Unpublished", count: unpublishedCount },
@@ -1492,6 +1502,8 @@ export default function ShareProjectAdminDashboardPage() {
                                           ? "bg-sky-100 text-sky-800"
                                           : st === "approved"
                                           ? "bg-emerald-100 text-emerald-800"
+                                          : st === "publish_requested"
+                                          ? "bg-purple-100 text-purple-800"
                                           : st === "rejected"
                                           ? "bg-rose-100 text-rose-800"
                                           : st === "pending"
@@ -1499,7 +1511,7 @@ export default function ShareProjectAdminDashboardPage() {
                                           : "bg-slate-100 text-slate-700"
                                       }`}
                                     >
-                                      {st}
+                                      {st === "publish_requested" ? "Requested For Publish" : st}
                                     </span>
                                     {Boolean(p.rejectionReason) && (
                                       <p
@@ -1539,7 +1551,7 @@ export default function ShareProjectAdminDashboardPage() {
                                         </>
                                       )}
 
-                                      {["approved", "unpublished"].includes(st) &&
+                                      {["approved", "unpublished", "publish_requested"].includes(st) &&
                                         projectStatusFilter !== "trash" && (
                                           <button
                                             disabled={isActionLoading}
@@ -2005,6 +2017,9 @@ export default function ShareProjectAdminDashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* VIEW: SETTINGS */}
+              {activeMenu === "settings" && <AdminProjectImageSettings />}
             </main>
           </div>
         </div>
