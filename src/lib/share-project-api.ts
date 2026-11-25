@@ -32,14 +32,52 @@ function unwrap<T>(payload: unknown): T {
   return ("data" in root ? root.data : root) as T;
 }
 
+// Fast In-Memory Client Cache & In-Flight Request Deduplication
+const clientApiCache = new Map<string, { data: any; expiry: number }>();
+const inflightRequests = new Map<string, Promise<any>>();
+
+async function cachedGet<T>(path: string, ttlMs = 20000): Promise<T> {
+  const now = Date.now();
+  const cached = clientApiCache.get(path);
+  if (cached && cached.expiry > now) {
+    return cached.data as T;
+  }
+  const inflight = inflightRequests.get(path);
+  if (inflight) {
+    return inflight as Promise<T>;
+  }
+
+  const promise = (async () => {
+    try {
+      const response = await api.get(path);
+      const data = unwrap<T>(response.data);
+      clientApiCache.set(path, { data, expiry: Date.now() + ttlMs });
+      return data;
+    } finally {
+      inflightRequests.delete(path);
+    }
+  })();
+
+  inflightRequests.set(path, promise);
+  return promise;
+}
+
+export function clearClientProjectCache() {
+  clientApiCache.clear();
+}
+
 export async function getPublicProjects(page = 1, limit = 100) {
-  const response = await api.get(`${ROOT}/public/projects?page=${page}&limit=${limit}`);
-  return unwrap<{ data: ShareApiProject[]; meta?: { total: number; page: number; limit: number; totalPages?: number } }>(response.data);
+  return cachedGet<{ data: ShareApiProject[]; meta?: { total: number; page: number; limit: number; totalPages?: number } }>(
+    `${ROOT}/public/projects?page=${page}&limit=${limit}`,
+    20000,
+  );
 }
 
 export async function getPublicProject(uuid: string) {
-  const response = await api.get(`${ROOT}/public/projects/${encodeURIComponent(uuid)}`);
-  return unwrap<ShareApiProject>(response.data);
+  return cachedGet<ShareApiProject>(
+    `${ROOT}/public/projects/${encodeURIComponent(uuid)}`,
+    30000,
+  );
 }
 
 export async function getOwnerProjects(status?: string, page = 1, limit = 100) {
@@ -55,26 +93,32 @@ export async function getOwnerProject(uuid: string) {
 }
 
 export async function getPublicCategories() {
-  const response = await api.get(`${ROOT}/public/categories`);
-  return unwrap<Array<{ id: number; uuid: string; code: string; name: string }>>(response.data);
+  return cachedGet<Array<{ id: number; uuid: string; code: string; name: string }>>(
+    `${ROOT}/public/categories`,
+    60000,
+  );
 }
 
 export async function createOwnerProject(dto: Record<string, unknown>) {
+  clearClientProjectCache();
   const response = await api.post(`${ROOT}/owner/projects`, dto);
   return unwrap<ShareApiProject>(response.data);
 }
 
 export async function updateOwnerProject(uuid: string, dto: Record<string, unknown>) {
+  clearClientProjectCache();
   const response = await api.put(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}`, dto);
   return unwrap<ShareApiProject>(response.data);
 }
 
 export async function submitOwnerProject(uuid: string) {
+  clearClientProjectCache();
   const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/submit`);
   return unwrap<ShareApiProject>(response.data);
 }
 
 export async function resubmitOwnerProject(uuid: string) {
+  clearClientProjectCache();
   const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/resubmit`);
   return unwrap<ShareApiProject>(response.data);
 }
@@ -85,16 +129,19 @@ export async function getOwnerSubmissionHistory(uuid: string) {
 }
 
 export async function requestPublishOwnerProject(uuid: string) {
+  clearClientProjectCache();
   const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/publish-request`, {});
   return unwrap<Record<string, unknown>>(response.data);
 }
 
 export async function unpublishOwnerProject(uuid: string) {
+  clearClientProjectCache();
   const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/unpublish`, {});
   return unwrap<Record<string, unknown>>(response.data);
 }
 
 export async function deleteOwnerProject(uuid: string) {
+  clearClientProjectCache();
   const response = await api.delete(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}`);
   return unwrap<{ success?: boolean; message?: string }>(response.data);
 }
