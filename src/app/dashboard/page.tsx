@@ -6,6 +6,8 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Plus,
   Trophy,
@@ -97,6 +99,7 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<ShareUserDashboardData>({});
   const [assignments, setAssignments] = useState<ShareAssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [txPage, setTxPage] = useState(1);
 
   useEffect(() => {
     setCurrentUser(getStoredUser());
@@ -235,10 +238,23 @@ export default function DashboardPage() {
       };
     });
 
-    return [...shareTx, ...assignTx]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 8);
+    return [...shareTx, ...assignTx].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }, [dashboard.recentTransactions, assignments]);
+
+  const TX_PER_PAGE = 4;
+  const totalTxPages = Math.max(1, Math.ceil(recentTransactions.length / TX_PER_PAGE));
+  const paginatedTransactions = useMemo(() => {
+    const start = (txPage - 1) * TX_PER_PAGE;
+    return recentTransactions.slice(start, start + TX_PER_PAGE);
+  }, [recentTransactions, txPage]);
+
+  useEffect(() => {
+    if (txPage > totalTxPages) {
+      setTxPage(1);
+    }
+  }, [totalTxPages, txPage]);
 
   const leaderboard = useMemo(() => {
     const merged = new Map<string, { name: string; pts: number }>();
@@ -384,9 +400,9 @@ export default function DashboardPage() {
   const today = new Intl.DateTimeFormat(lang === "bn" ? "bn-BD" : "en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
 
   return (
-    <div className="flex flex-1 flex-col h-[calc(100vh-9.5rem)] max-h-[calc(100vh-9.5rem)] overflow-hidden w-full">
-      {/* ══════════════ STATIC PINNED TOP: Welcome & Summary Counting Cards ══════════════ */}
-      <div className="shrink-0 space-y-3.5 pb-3.5">
+    <div className="space-y-6 pb-12 w-full">
+      {/* ══════════════ Welcome Header & Summary Counting Cards ══════════════ */}
+      <div className="space-y-4">
         {/* Welcome Header */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -476,7 +492,7 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* 4 Summary Counter Cards (Static) */}
+        {/* 4 Summary Counter Cards */}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {kpis.map((k, i) => (
             <motion.div
@@ -505,8 +521,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ══════════════ SCROLLABLE GRAPHS, CHARTS, AND LIST DATA ══════════════ */}
-      <div className="flex-1 overflow-y-auto space-y-6 pr-1 pb-10 scroll-thin">
+      {/* ══════════════ GRAPHS, CHARTS, AND LIST DATA ══════════════ */}
+      <div className="space-y-6">
         {/* Growth + Allocation */}
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <section className={card}>
@@ -634,61 +650,113 @@ export default function DashboardPage() {
 
         {/* Table + Leaderboard */}
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-          <section className={`${card} overflow-hidden`}>
-            <CardHead
-              title={isBuyer ? t({ bn: "আমার সাম্প্রতিক লেনদেন", en: "My recent transactions" }) : t({ bn: "সাম্প্রতিক লেনদেন", en: "Recent transactions" })}
-              right={
-                <Link
-                  href={isBuyer ? "/dashboard/shares" : "/dashboard/project/share-project/share-collection-report"}
-                  className="text-xs font-semibold text-emerald-600 hover:underline"
-                >
-                  {t({ bn: "সব দেখুন", en: "View all" })}
-                </Link>
-              }
-            />
-            <div className="scroll-thin -mx-2 overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-sm">
-                <thead className="text-xs uppercase tracking-wider text-slate-400">
-                  <tr>
-                    <th className="px-2 pb-3 font-semibold">{isBuyer ? t({ bn: "বিনিয়োগকারী", en: "Investor" }) : t({ bn: "শেয়ারহোল্ডার", en: "Shareholder" })}</th>
-                    <th className="px-2 pb-3 font-semibold">{t({ bn: "প্রজেক্ট", en: "Project" })}</th>
-                    <th className="px-2 pb-3 font-semibold">{t({ bn: "পরিমাণ", en: "Amount" })}</th>
-                    <th className="px-2 pb-3 font-semibold">{t({ bn: "অবস্থা", en: "Status" })}</th>
-                    <th className="px-2 pb-3 text-right font-semibold">{t({ bn: "তারিখ", en: "Date" })}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentTransactions.length > 0 ? (
-                    recentTransactions.map((r, i) => (
-                      <tr key={r.uuid || i} className="border-t border-slate-100 transition hover:bg-slate-50">
-                        <td className="px-2 py-3.5">
-                          <span className="flex items-center gap-3 font-semibold text-slate-900">
-                            <span className="grid h-8 w-8 place-items-center rounded-full text-[11px] font-bold text-white" style={{ background: PALETTE[i % 5] }}>
-                              {r.who.slice(0, 1).toUpperCase()}
-                            </span>
-                            {r.who}
-                          </span>
-                        </td>
-                        <td className="px-2 py-3.5 text-slate-600">{r.project}</td>
-                        <td className="px-2 py-3.5 font-semibold text-slate-900">{taka(r.amount)}</td>
-                        <td className="px-2 py-3.5">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusStyle[r.status]}`}>
-                            {t(statusLabel[r.status])}
-                          </span>
-                        </td>
-                        <td className="px-2 py-3.5 text-right text-slate-500">{formatTxDate(r.createdAt)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr className="border-t border-slate-100">
-                      <td colSpan={5} className="px-2 py-8 text-center text-sm text-slate-400">
-                        {loading ? t({ bn: "লোড হচ্ছে...", en: "Loading..." }) : t({ bn: "এখনও কোনো লেনদেন হয়নি", en: "No transactions yet" })}
-                      </td>
+          <section className={`${card} flex flex-col justify-between overflow-hidden`}>
+            <div>
+              <CardHead
+                title={isBuyer ? t({ bn: "আমার সাম্প্রতিক লেনদেন", en: "My recent transactions" }) : t({ bn: "সাম্প্রতিক লেনদেন", en: "Recent transactions" })}
+                right={
+                  <Link
+                    href={isBuyer ? "/dashboard/shares" : "/dashboard/project/share-project/share-collection-report"}
+                    className="text-xs font-semibold text-emerald-600 hover:underline"
+                  >
+                    {t({ bn: "সব দেখুন", en: "View all" })}
+                  </Link>
+                }
+              />
+              <div className="scroll-thin overflow-x-auto">
+                <table className="w-full min-w-[480px] text-left text-sm">
+                  <thead className="text-xs uppercase tracking-wider text-slate-400">
+                    <tr>
+                      <th className="px-2 pb-3 font-semibold">{isBuyer ? t({ bn: "বিনিয়োগকারী", en: "Investor" }) : t({ bn: "শেয়ারহোল্ডার", en: "Shareholder" })}</th>
+                      <th className="px-2 pb-3 font-semibold">{t({ bn: "প্রজেক্ট", en: "Project" })}</th>
+                      <th className="px-2 pb-3 font-semibold">{t({ bn: "পরিমাণ", en: "Amount" })}</th>
+                      <th className="px-2 pb-3 font-semibold">{t({ bn: "অবস্থা", en: "Status" })}</th>
+                      <th className="px-2 pb-3 text-right font-semibold">{t({ bn: "তারিখ", en: "Date" })}</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {paginatedTransactions.length > 0 ? (
+                      paginatedTransactions.map((r, i) => (
+                        <tr key={r.uuid || i} className="border-t border-slate-100 transition hover:bg-slate-50">
+                          <td className="px-2 py-3.5">
+                            <span className="flex items-center gap-3 font-semibold text-slate-900">
+                              <span
+                                className="grid h-8 w-8 place-items-center rounded-full text-[11px] font-bold text-white"
+                                style={{ background: PALETTE[((txPage - 1) * TX_PER_PAGE + i) % 5] }}
+                              >
+                                {r.who.slice(0, 1).toUpperCase()}
+                              </span>
+                              {r.who}
+                            </span>
+                          </td>
+                          <td className="px-2 py-3.5 text-slate-600">{r.project}</td>
+                          <td className="px-2 py-3.5 font-semibold text-slate-900">{taka(r.amount)}</td>
+                          <td className="px-2 py-3.5">
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusStyle[r.status]}`}>
+                              {t(statusLabel[r.status])}
+                            </span>
+                          </td>
+                          <td className="px-2 py-3.5 text-right text-slate-500">{formatTxDate(r.createdAt)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t border-slate-100">
+                        <td colSpan={5} className="px-2 py-8 text-center text-sm text-slate-400">
+                          {loading ? t({ bn: "লোড হচ্ছে...", en: "Loading..." }) : t({ bn: "এখনও কোনো লেনদেন হয়নি", en: "No transactions yet" })}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* 4 Items per page Pagination */}
+            {recentTransactions.length > TX_PER_PAGE && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                <p>
+                  {t({
+                    bn: `পৃষ্ঠা ${num(txPage)} / ${num(totalTxPages)} (মোট ${num(recentTransactions.length)}টি লেনদেন)`,
+                    en: `Page ${num(txPage)} of ${num(totalTxPages)} (${num(recentTransactions.length)} total)`,
+                  })}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={txPage <= 1}
+                    onClick={() => setTxPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    title={t({ bn: "পূর্ববর্তী", en: "Previous" })}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {Array.from({ length: totalTxPages }, (_, idx) => idx + 1).map((pg) => (
+                    <button
+                      key={pg}
+                      type="button"
+                      data-page-btn={pg}
+                      onClick={() => setTxPage(pg)}
+                      className={`inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-lg px-2 text-xs font-semibold transition ${
+                        txPage === pg
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {num(pg)}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={txPage >= totalTxPages}
+                    onClick={() => setTxPage((p) => Math.min(totalTxPages, p + 1))}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    title={t({ bn: "পরবর্তী", en: "Next" })}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className={card}>

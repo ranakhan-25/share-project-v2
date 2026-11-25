@@ -109,7 +109,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onMobileClose={() => setMobileOpen(false)}
           />
           <div className="flex flex-1 flex-col min-w-0 lg:border-r border-slate-200">
-            <main className="p-4 sm:p-6 lg:p-8 flex flex-1 flex-col min-w-0 overflow-hidden">{children}</main>
+            <main className="p-4 sm:p-6 lg:p-8 flex-1 min-w-0">{children}</main>
           </div>
         </div>
       </div>
