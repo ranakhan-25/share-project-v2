@@ -419,15 +419,17 @@ export default function ProjectsPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           setSharingProject({
                             id: project.id,
                             name: t(project.name),
                             location: t(project.location),
-                          })
-                        }
+                          });
+                        }}
                         title={t({ bn: "প্রজেক্ট শেয়ার করুন", en: "Share project" })}
-                        className="absolute right-4 top-4 grid h-8.5 w-8.5 place-items-center rounded-full bg-white/90 backdrop-blur-md text-slate-700 hover:bg-white hover:text-blue-600 shadow-sm transition"
+                        className="absolute right-4 top-4 z-10 grid h-8.5 w-8.5 place-items-center rounded-full bg-white/90 backdrop-blur-md text-slate-700 hover:bg-white hover:text-emerald-600 shadow-sm transition cursor-pointer"
                       >
                         <Share2 className="h-4 w-4" />
                       </button>
@@ -482,28 +484,14 @@ export default function ProjectsPage() {
                           />
                         </div>
                       </div>
-                      <div className="mt-5 flex items-center gap-2">
+                      <div className="mt-5">
                         <Link
                           href={`/projects/${project.id}`}
-                          className="flex flex-1 items-center justify-between rounded-2xl bg-ink-950 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                          className="flex w-full items-center justify-between rounded-2xl bg-ink-950 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
                         >
                           {t({ bn: "বিস্তারিত দেখুন", en: "View details" })}
                           <ArrowRight className="h-4 w-4" />
                         </Link>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSharingProject({
-                              id: project.id,
-                              name: t(project.name),
-                              location: t(project.location),
-                            })
-                          }
-                          title={t({ bn: "প্রজেক্ট শেয়ার করুন", en: "Share project" })}
-                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 shadow-xs transition cursor-pointer"
-                        >
-                          <Share2 className="h-4 w-4" />
-                        </button>
                       </div>
                     </div>
                   </article>

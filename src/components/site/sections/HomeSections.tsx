@@ -384,31 +384,17 @@ export function FeaturedProjects() {
                       )}
                     </div>
 
-                    {/* Details & Share Buttons */}
-                    <div className="mt-6 flex items-center gap-2">
+                    {/* View Details Button */}
+                    <div className="mt-6">
                       <Link
                         href={`/projects/${p.id}`}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-800 transition hover:border-emerald-600 hover:bg-emerald-600 hover:text-white"
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-800 transition hover:border-emerald-600 hover:bg-emerald-600 hover:text-white"
                       >
                         {t({
                           bn: "বিস্তারিত দেখুন",
                           en: "View details",
                         })}
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSharingProject({
-                            id: p.id,
-                            name: p.name,
-                            location: p.location,
-                          })
-                        }
-                        title={t({ bn: "প্রজেক্ট শেয়ার করুন", en: "Share project" })}
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer shadow-2xs"
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </button>
                     </div>
                   </div>
                 </article>
