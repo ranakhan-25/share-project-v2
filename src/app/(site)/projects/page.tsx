@@ -79,21 +79,12 @@ export default function ProjectsPage() {
       setLoading(true);
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      try {
-        controller.abort();
-      } catch {}
-    }, 10000);
-
     fetch(
       `${API_BASE}/realbizpro/api/v1/share-project/public/projects?page=${currentPage}&limit=${pageSize}`,
-      { signal: controller.signal }
     )
       .then((res) => (res.ok ? res.json() : null))
       .then((payload: unknown) => {
         if (!active) return;
-        clearTimeout(timeoutId);
         const root =
           payload && typeof payload === "object"
             ? (payload as { data?: unknown; meta?: any })
@@ -176,7 +167,6 @@ export default function ProjectsPage() {
 
     return () => {
       active = false;
-      clearTimeout(timeoutId);
     };
   }, [currentPage]);
 
