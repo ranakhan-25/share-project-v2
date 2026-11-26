@@ -1,5 +1,6 @@
 "use client";
 
+
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
@@ -26,31 +27,63 @@ import { getProjectDefaultImage } from "@/lib/project-defaults";
 import type { OwnerProject } from "@/lib/owner-projects";
 import type { InvestorProject } from "@/data/investorProjects";
 
+interface ProjectsCacheEntry {
+  rows: OwnerProject[];
+  total: number;
+  totalPages: number;
+  timestamp: number;
+}
+const projectsPageCache = new Map<number, ProjectsCacheEntry>();
+
 export default function ProjectsPage() {
   const { t, taka, num } = useLang();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState("featured");
-  const [ownerPublished, setOwnerPublished] = useState<OwnerProject[]>([]);
+  const [ownerPublished, setOwnerPublished] = useState<OwnerProject[]>(() => {
+    return projectsPageCache.get(1)?.rows || [];
+  });
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalProjects, setTotalProjects] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(() => {
+    return projectsPageCache.get(1)?.totalPages || 1;
+  });
+  const [totalProjects, setTotalProjects] = useState(() => {
+    return projectsPageCache.get(1)?.total || 0;
+  });
+  const [loading, setLoading] = useState(() => {
+    return !projectsPageCache.has(1);
+  });
   const [sharingProject, setSharingProject] = useState<{ id: string; name: string; location?: string } | null>(null);
   const pageSize = 9;
 
   useEffect(() => {
     const API_BASE =
       process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
-    setLoading(true);
+
+    // Instant SWR cache retrieval
+    const cached = projectsPageCache.get(currentPage);
+    if (cached) {
+      setOwnerPublished(cached.rows);
+      setTotalProjects(cached.total);
+      setTotalPages(cached.totalPages);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     fetch(
       `${API_BASE}/realbizpro/api/v1/share-project/public/projects?page=${currentPage}&limit=${pageSize}`,
+      { signal: controller.signal }
     )
       .then((res) => (res.ok ? res.json() : null))
       .then((payload: unknown) => {
+        clearTimeout(timeoutId);
         const root =
           payload && typeof payload === "object"
-            ? (payload as { data?: unknown })
+            ? (payload as { data?: unknown; meta?: any })
             : {};
         const inner =
           root.data && typeof root.data === "object"
@@ -59,51 +92,74 @@ export default function ProjectsPage() {
                 meta?: { total?: number; page?: number; totalPages?: number };
               })
             : {};
-        const data = Array.isArray(root.data)
-          ? root.data
-          : Array.isArray(inner.data)
-            ? inner.data
+        const data = Array.isArray(inner.data)
+          ? inner.data
+          : Array.isArray(root.data)
+            ? root.data
             : [];
-        const meta = inner.meta;
-        const rows = (data as Record<string, unknown>[]).map((project) => ({
-          id: String(project.uuid || project.id || ""),
-          name: String(project.name || ""),
-          location: String(project.location || ""),
-          category: String(
-            (project.category as { name?: string } | undefined)?.name || "",
-          ),
-          thumbnail: String(project.thumbnailUrl || ""),
-          pricePerShare: Number(project.pricePerShare || 0),
-          totalShares: Number(project.totalShares || 0),
-          expectedAnnualReturn: Number(project.expectedAnnualReturn || 0),
-          startDate: String(project.startDate || ""),
-          endDate: String(project.endDate || ""),
-          description: String(project.description || ""),
-          documents: Array.isArray(project.documents)
-            ? project.documents.map((document) =>
-                String((document as { title?: string }).title || ""),
-              )
-            : [],
-          status: "published",
-        })) as OwnerProject[];
-        setOwnerPublished(rows);
-        setTotalProjects(Number(meta?.total || rows.length));
-        setTotalPages(
-          Math.max(
-            1,
-            Number(
-              meta?.totalPages ||
-                Math.ceil(Number(meta?.total || rows.length) / pageSize),
+        const meta = inner.meta || (root as any).meta;
+        const rows = (data as Record<string, unknown>[]).map((project) => {
+          let thumb = String(project.thumbnailUrl || "");
+          if (thumb && thumb.startsWith("/")) {
+            thumb = `${API_BASE}${thumb}`;
+          }
+          return {
+            id: String(project.uuid || project.id || ""),
+            name: String(project.name || ""),
+            location: String(project.location || ""),
+            category: String(
+              (project.category as { name?: string } | undefined)?.name || "",
             ),
+            thumbnail: thumb,
+            pricePerShare: Number(project.pricePerShare || 0),
+            totalShares: Number(project.totalShares || 0),
+            expectedAnnualReturn: Number(project.expectedAnnualReturn || 0),
+            startDate: String(project.startDate || ""),
+            endDate: String(project.endDate || ""),
+            description: String(project.description || ""),
+            documents: Array.isArray(project.documents)
+              ? project.documents.map((document) =>
+                  String((document as { title?: string }).title || ""),
+                )
+              : [],
+            status: "published",
+          };
+        }) as OwnerProject[];
+
+        const total = Number(meta?.total ?? rows.length);
+        const pages = Math.max(
+          1,
+          Number(
+            meta?.totalPages ??
+              Math.ceil(total / pageSize),
           ),
         );
+
+        projectsPageCache.set(currentPage, {
+          rows,
+          total,
+          totalPages: pages,
+          timestamp: Date.now(),
+        });
+
+        setOwnerPublished(rows);
+        setTotalProjects(total);
+        setTotalPages(pages);
       })
-      .catch(() => {
-        setOwnerPublished([]);
-        setTotalProjects(0);
-        setTotalPages(1);
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        if (!cached) {
+          setOwnerPublished([]);
+          setTotalProjects(0);
+          setTotalPages(1);
+        }
       })
       .finally(() => setLoading(false));
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
   }, [currentPage]);
 
   const publishedProjects: InvestorProject[] = useMemo(
@@ -320,10 +376,15 @@ export default function ProjectsPage() {
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 shadow-xs text-xs font-semibold text-slate-700 w-fit shrink-0">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>
-                {t({
-                  bn: `মোট ${num(totalProjects || filtered.length)} টির মধ্যে ${num(filtered.length)} টি প্রদর্শিত হচ্ছে`,
-                  en: `Showing ${filtered.length} of ${totalProjects || filtered.length} projects`,
-                })}
+                {loading && ownerPublished.length === 0
+                  ? t({
+                      bn: "প্রজেক্ট লোড হচ্ছে...",
+                      en: "Loading projects...",
+                    })
+                  : t({
+                      bn: `মোট ${num(totalProjects || filtered.length)} টির মধ্যে ${num(filtered.length)} টি প্রদর্শিত হচ্ছে`,
+                      en: `Showing ${filtered.length} of ${totalProjects || filtered.length} projects`,
+                    })}
               </span>
             </div>
           </div>
@@ -386,18 +447,55 @@ export default function ProjectsPage() {
           </div>
 
           <div className="mt-6 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
-            {loading && (
+            {loading && ownerPublished.length === 0 ? (
+              Array.from({ length: 6 }).map((_, idx) => (
+                <div
+                  key={`skeleton-${idx}`}
+                  className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm animate-pulse"
+                >
+                  <div className="h-52 w-full bg-slate-200" />
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3.5 w-3.5 rounded-full bg-slate-200" />
+                      <div className="h-3 w-28 bg-slate-200 rounded" />
+                    </div>
+                    <div className="h-6 w-3/4 bg-slate-200 rounded-md" />
+                    <div className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-3">
+                      <div className="space-y-1">
+                        <div className="h-2.5 w-12 bg-slate-200 rounded" />
+                        <div className="h-4 w-16 bg-slate-200 rounded" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="h-2.5 w-10 bg-slate-200 rounded" />
+                        <div className="h-4 w-12 bg-slate-200 rounded" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="h-2.5 w-14 bg-slate-200 rounded" />
+                        <div className="h-4 w-10 bg-slate-200 rounded" />
+                      </div>
+                    </div>
+                    <div className="h-11 w-full bg-slate-200 rounded-2xl" />
+                  </div>
+                </div>
+              ))
+            ) : filtered.length === 0 ? (
               <div className="col-span-full rounded-[28px] border border-dashed border-slate-300 bg-white py-16 text-center">
+                <Building2 className="mx-auto h-10 w-10 text-slate-300 mb-3" />
                 <p className="font-bold text-slate-700">
                   {t({
-                    bn: "প্রজেক্ট লোড হচ্ছে...",
-                    en: "Loading projects...",
+                    bn: "কোনো প্রজেক্ট পাওয়া যায়নি",
+                    en: "No projects found",
+                  })}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {t({
+                    bn: "অনুগ্রহ করে অন্য কিওয়ার্ড বা ফিল্টার চেষ্টা করুন",
+                    en: "Please try another keyword or filter",
                   })}
                 </p>
               </div>
-            )}
-            {!loading &&
-              filtered.map((project) => {
+            ) : null}
+            {filtered.map((project) => {
                 const percent = Math.round(
                   (project.soldShares / project.totalShares) * 100,
                 );
