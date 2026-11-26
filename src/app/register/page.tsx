@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
@@ -25,11 +25,12 @@ import {
   Sparkles,
   TrendingUp,
   User,
+  Users,
 } from "lucide-react";
 
 import { useLang, type Bi } from "@/lib/i18n";
 import { LangSwitch } from "@/components/site/LangSwitch";
-import { LogoMark, Logo } from "@/components/site/Logo";
+import { Logo } from "@/components/site/Logo";
 import { Navbar } from "@/components/site/Navbar";
 
 const API_BASE = (
@@ -69,6 +70,9 @@ const slides: { image: string; badge: Bi; title: Bi; description: Bi }[] = [
   },
 ];
 
+type RoleType = "seller" | "buyer";
+type EntityType = "individual" | "community" | "organisation";
+
 export default function RegisterPage() {
   const router = useRouter();
   const { t } = useLang();
@@ -79,24 +83,40 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [userType, setUserType] = useState<"seller" | "buyer">("seller");
   const [showPw, setShowPw] = useState(false);
 
-  // Seller-specific fields
-  const [sellerNid, setSellerNid] = useState("");
-  const [sellerTradeLicense, setSellerTradeLicense] = useState("");
-  const [sellerMdName, setSellerMdName] = useState("");
-  const [sellerOfficeAddress, setSellerOfficeAddress] = useState("");
-  const [sellerPhoneAlt, setSellerPhoneAlt] = useState("");
-  const [sellerWebsite, setSellerWebsite] = useState("");
-  const [sellerFacebook, setSellerFacebook] = useState("");
+  // User Role & Entity Type
+  const [userType, setUserType] = useState<RoleType>("seller");
+  const [entityType, setEntityType] = useState<EntityType>("individual");
 
-  // Buyer-specific fields
-  const [buyerProfession, setBuyerProfession] = useState("");
-  const [buyerDesignation, setBuyerDesignation] = useState("");
-  const [buyerBudget, setBuyerBudget] = useState("");
-  const [buyerPreferableCategory, setBuyerPreferableCategory] = useState("");
-  const [buyerInterestedLocation, setBuyerInterestedLocation] = useState("");
+  // 1. Individual Details
+  const [nidNumber, setNidNumber] = useState("");
+  const [profession, setProfession] = useState("");
+  const [presentAddress, setPresentAddress] = useState("");
+  const [phoneAlt, setPhoneAlt] = useState("");
+
+  // 2. Community & Representative Details
+  const [communityName, setCommunityName] = useState("");
+  const [representativeName, setRepresentativeName] = useState("");
+  const [communityDesignation, setCommunityDesignation] = useState("");
+  const [memberCount, setMemberCount] = useState<number | string>("");
+  const [communityRegNo, setCommunityRegNo] = useState("");
+  const [communityAddress, setCommunityAddress] = useState("");
+
+  // 3. Organisation & Signatory Details
+  const [companyName, setCompanyName] = useState("");
+  const [businessType, setBusinessType] = useState("Private Limited Company");
+  const [tradeLicense, setTradeLicense] = useState("");
+  const [signatoryName, setSignatoryName] = useState("");
+  const [signatoryDesignation, setSignatoryDesignation] = useState("");
+  const [officeAddress, setOfficeAddress] = useState("");
+  const [website, setWebsite] = useState("");
+  const [facebookPage, setFacebookPage] = useState("");
+
+  // 4. Buyer Preferences (when userType === "buyer")
+  const [buyerBudget, setBuyerBudget] = useState("৳৫,০০,০০০ - ৳১০,০০,০০০");
+  const [buyerPreferableCategory, setBuyerPreferableCategory] = useState("Commercial Real Estate");
+  const [buyerInterestedLocation, setBuyerInterestedLocation] = useState("Dhaka");
 
   // Form handling
   const [error, setError] = useState("");
@@ -112,17 +132,72 @@ export default function RegisterPage() {
     return () => clearInterval(id);
   }, [currentSlide]);
 
+  const isFormValid = useMemo(() => {
+    // 1. Basic credentials
+    if (!name.trim()) return false;
+    if (!phone.trim()) return false;
+    if (!email.trim() || !email.includes("@")) return false;
+    if (password.length < 8) return false;
+    if (password !== confirmPassword) return false;
+
+    // 2. Entity-specific required fields
+    if (entityType === "individual") {
+      if (!nidNumber.trim()) return false;
+      if (!presentAddress.trim()) return false;
+    } else if (entityType === "community") {
+      if (!communityName.trim()) return false;
+      if (!representativeName.trim()) return false;
+      if (!communityDesignation.trim()) return false;
+      if (!memberCount || Number(memberCount) <= 0) return false;
+    } else if (entityType === "organisation") {
+      if (!companyName.trim()) return false;
+      if (!tradeLicense.trim()) return false;
+      if (!signatoryName.trim()) return false;
+      if (!signatoryDesignation.trim()) return false;
+      if (!officeAddress.trim()) return false;
+    }
+
+    // 3. Buyer preferences
+    if (userType === "buyer") {
+      if (!buyerBudget.trim()) return false;
+      if (!buyerPreferableCategory.trim()) return false;
+    }
+
+    return true;
+  }, [
+    name,
+    phone,
+    email,
+    password,
+    confirmPassword,
+    entityType,
+    nidNumber,
+    presentAddress,
+    communityName,
+    representativeName,
+    communityDesignation,
+    memberCount,
+    companyName,
+    tradeLicense,
+    signatoryName,
+    signatoryDesignation,
+    officeAddress,
+    userType,
+    buyerBudget,
+    buyerPreferableCategory,
+  ]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     // Basic Account Validations
     if (!name.trim()) {
-      setError(t({ bn: "পুরো নাম দিন।", en: "Please enter your full name." }));
+      setError(t({ bn: "আপনার পুরো নাম প্রদান করুন।", en: "Please enter your full name." }));
       return;
     }
     if (!email.trim()) {
-      setError(t({ bn: "ইমেইল ঠিকানা দিন।", en: "Please enter an email address." }));
+      setError(t({ bn: "ইমেইল ঠিকানা প্রদান করুন।", en: "Please enter an email address." }));
       return;
     }
     if (password.length < 8) {
@@ -144,67 +219,99 @@ export default function RegisterPage() {
       return;
     }
 
-    // Role-Specific Validations
-    if (userType === "seller") {
-      if (!sellerNid.trim()) {
-        setError(t({ bn: "সেলার আইডি / এনআইডি নম্বর দিন।", en: "Please provide Seller ID / NID number." }));
+    // Entity-Specific Validations
+    if (entityType === "individual") {
+      if (!nidNumber.trim()) {
+        setError(t({ bn: "জাতীয় পরিচয়পত্র (NID) নম্বর আবশ্যক।", en: "National ID (NID) number is required." }));
         return;
       }
-      if (!sellerTradeLicense.trim()) {
-        setError(t({ bn: "ট্রেড লাইসেন্স নম্বর দিন।", en: "Please provide Trade License number." }));
+      if (!presentAddress.trim()) {
+        setError(t({ bn: "বর্তমান ঠিকানা প্রদান করুন।", en: "Please enter your present address." }));
         return;
       }
-      if (!sellerMdName.trim()) {
-        setError(t({ bn: "ম্যানেজিং ডিরেক্টর (MD) এর নাম দিন।", en: "Please provide Managing Director (MD) name." }));
+    } else if (entityType === "community") {
+      if (!communityName.trim()) {
+        setError(t({ bn: "কমিউনিটি বা সমিতির নাম আবশ্যক।", en: "Community / Association name is required." }));
         return;
       }
-      if (!sellerOfficeAddress.trim()) {
-        setError(t({ bn: "অফিস এড্রেস দিন।", en: "Please provide office address." }));
+      if (!representativeName.trim()) {
+        setError(t({ bn: "প্রধান প্রতিনিধির নাম উল্লেখ করুন।", en: "Lead representative name is required." }));
         return;
       }
-    } else {
-      if (!buyerProfession.trim()) {
-        setError(t({ bn: "আপনার পেশা / প্রফেশন উল্লেখ করুন।", en: "Please provide your profession." }));
+      if (!communityDesignation.trim()) {
+        setError(t({ bn: "প্রতিনিধির পদবি উল্লেখ করুন।", en: "Designation in community is required." }));
         return;
       }
-      if (!buyerBudget.trim()) {
-        setError(t({ bn: "আপনার বিনিয়োগ বাজেট নির্বাচন বা উল্লেখ করুন।", en: "Please specify your investment budget." }));
+      if (!memberCount || Number(memberCount) <= 0) {
+        setError(t({ bn: "কমিউনিটি সদস্য সংখ্যা উল্লেখ করুন।", en: "Total community members count is required." }));
         return;
       }
-      if (!buyerPreferableCategory.trim()) {
-        setError(t({ bn: "পছন্দনীয় ক্যাটাগরি নির্বাচন করুন।", en: "Please select preferable project category." }));
+    } else if (entityType === "organisation") {
+      if (!companyName.trim()) {
+        setError(t({ bn: "প্রতিষ্ঠানের নিবন্ধিত নাম প্রদান করুন।", en: "Registered Company Name is required." }));
+        return;
+      }
+      if (!tradeLicense.trim()) {
+        setError(t({ bn: "ট্রেড লাইসেন্স বা আরজেএসসি নম্বর প্রদান করুন।", en: "Trade License / RJSC number is required." }));
+        return;
+      }
+      if (!signatoryName.trim() || !signatoryDesignation.trim()) {
+        setError(t({ bn: "অনুমোদিত প্রতিনিধির নাম ও পদবি প্রদান করুন।", en: "Authorized signatory name and designation are required." }));
+        return;
+      }
+      if (!officeAddress.trim()) {
+        setError(t({ bn: "প্রতিষ্ঠানের কার্যালয়ের ঠিকানা প্রদান করুন।", en: "Office address is required." }));
         return;
       }
     }
 
     setIsSubmitting(true);
     try {
+      const profileData: Record<string, any> = {
+        role: userType,
+        entityType,
+        ...(entityType === "individual"
+          ? {
+              nid: nidNumber.trim(),
+              profession: profession.trim() || undefined,
+              presentAddress: presentAddress.trim(),
+              phoneAlt: phoneAlt.trim() || undefined,
+            }
+          : entityType === "community"
+          ? {
+              communityName: communityName.trim(),
+              representativeName: representativeName.trim(),
+              designation: communityDesignation.trim(),
+              memberCount: Number(memberCount) || 0,
+              registrationNo: communityRegNo.trim() || undefined,
+              officeAddress: communityAddress.trim() || undefined,
+            }
+          : {
+              companyName: companyName.trim(),
+              businessType,
+              tradeLicense: tradeLicense.trim(),
+              signatoryName: signatoryName.trim(),
+              designation: signatoryDesignation.trim(),
+              officeAddress: officeAddress.trim(),
+              website: website.trim() || undefined,
+              facebookPage: facebookPage.trim() || undefined,
+            }),
+        ...(userType === "buyer"
+          ? {
+              budget: buyerBudget.trim(),
+              preferableCategory: buyerPreferableCategory.trim(),
+              interestedLocation: buyerInterestedLocation.trim() || undefined,
+            }
+          : {}),
+      };
+
       const payloadBody = {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
         password,
         userType: userType === "seller" ? "seller" : "buyer",
-        profile:
-          userType === "seller"
-            ? {
-                role: "seller",
-                nid: sellerNid.trim(),
-                tradeLicense: sellerTradeLicense.trim(),
-                mdName: sellerMdName.trim(),
-                officeAddress: sellerOfficeAddress.trim(),
-                sellerPhone: sellerPhoneAlt.trim() || phone.trim() || undefined,
-                website: sellerWebsite.trim() || undefined,
-                facebookPage: sellerFacebook.trim() || undefined,
-              }
-            : {
-                role: "buyer",
-                profession: buyerProfession.trim(),
-                designation: buyerDesignation.trim() || undefined,
-                budget: buyerBudget.trim(),
-                preferableCategory: buyerPreferableCategory.trim(),
-                interestedLocation: buyerInterestedLocation.trim() || undefined,
-              },
+        profile: profileData,
       };
 
       const res = await fetch(`${API_BASE}/realbizpro/api/v1/share-user/register`, {
@@ -218,25 +325,31 @@ export default function RegisterPage() {
       if (!res.ok) {
         const errorMsg =
           (payload && typeof payload.message === "string" ? payload.message : null) ||
-          (payload && Array.isArray(payload.message) ? payload.message.join(", ") : null) ||
-          "Registration failed. Please try again.";
-        throw new Error(errorMsg);
+          t({ bn: "নিবন্ধন ব্যর্থ হয়েছে।", en: "Registration failed." });
+        setError(errorMsg);
+        setIsSubmitting(false);
+        return;
       }
 
       setIsSuccess(true);
       setTimeout(() => {
-        router.push("/login");
+        router.push("/login?registered=true");
       }, 2500);
-    } catch (err: any) {
-      setError(err?.message || "Registration failed. Please try again.");
-    } finally {
+    } catch {
+      setError(
+        t({
+          bn: "সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি।",
+          en: "Could not connect to the server.",
+        }),
+      );
       setIsSubmitting(false);
     }
   };
 
-  const slide = slides[currentSlide];
-  const inputCls =
-    "w-full rounded-2xl border border-slate-200 bg-slate-50/80 py-2.5 pl-11 pr-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 disabled:opacity-60";
+  const inputBase =
+    "w-full rounded-2xl border border-slate-200 bg-white py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50";
+  const inputCls = `${inputBase} pl-11 pr-4`;
+  const inputNoIconCls = `${inputBase} px-4`;
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-slate-50 px-4 pt-28 pb-14 text-slate-800 antialiased">
@@ -255,112 +368,66 @@ export default function RegisterPage() {
         className="pointer-events-none absolute -right-32 bottom-10 h-[28rem] w-[28rem] rounded-full bg-teal-100/50 blur-[100px]"
       />
 
-      {/* Card */}
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-200/90 bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.08)] lg:grid lg:grid-cols-12"
+        className="relative w-full max-w-6xl overflow-hidden rounded-[32px] border border-slate-200/90 bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.08)] lg:grid lg:grid-cols-12 h-[88vh] max-h-[820px] min-h-[620px]"
       >
-        {/* LEFT — image slider (5 cols) */}
-        <div className="relative hidden min-h-[720px] overflow-hidden bg-slate-900 lg:col-span-5 lg:block">
-          <AnimatePresence initial={false} mode="sync">
+        {/* LEFT — photo carousel (5 cols) */}
+        <div className="relative hidden h-full flex-col justify-between overflow-hidden bg-slate-900 p-10 lg:flex lg:col-span-5">
+          <AnimatePresence mode="wait">
             <motion.div
               key={currentSlide}
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute inset-0 bg-slate-900"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={slide.image} alt="" className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-slate-950/45" />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
-            </motion.div>
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 z-0 bg-cover bg-center brightness-[0.7]"
+              style={{ backgroundImage: `url(${slides[currentSlide].image})` }}
+            />
           </AnimatePresence>
 
-          <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between p-8">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`badge-${currentSlide}`}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-md"
-              >
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                {t(slide.badge)}
-              </motion.div>
-            </AnimatePresence>
+          <div className="absolute inset-0 z-1 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/70" />
+
+          <div className="relative z-10 flex items-center justify-between">
+            <Logo tone="light" />
+            <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white/90 backdrop-blur-md">
+              Share Platform
+            </span>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 z-30 p-8 xl:p-10">
-            <div className="mb-6 flex items-center gap-3 text-white">
-              <LogoMark size={36} />
-              <span className="text-lg font-bold">Share Project</span>
-            </div>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentSlide}
-                initial={{ opacity: 0, x: 40 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -30 }}
-                transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-                className="max-w-md"
-              >
-                <h2 className="text-2xl font-bold leading-tight tracking-tight text-white xl:text-3xl">
-                  {t(slide.title)}
-                </h2>
-                <p className="mt-3 text-sm leading-relaxed text-white/75">
-                  {t(slide.description)}
-                </p>
-              </motion.div>
-            </AnimatePresence>
+          <div className="relative z-10 space-y-4">
+            <span className="inline-block rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-300 backdrop-blur-md">
+              {t(slides[currentSlide].badge)}
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight">
+              {t(slides[currentSlide].title)}
+            </h2>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              {t(slides[currentSlide].description)}
+            </p>
 
-            <div className="mt-8 flex items-center gap-2">
-              {slides.map((_, index) => (
+            <div className="flex gap-2 pt-2">
+              {slides.map((_, i) => (
                 <button
-                  key={index}
+                  key={i}
                   type="button"
-                  onClick={() => setCurrentSlide(index)}
-                  aria-label={`Slide ${index + 1}`}
-                  className="group py-2"
-                >
-                  <span
-                    className={`relative block h-1 overflow-hidden rounded-full bg-white/30 transition-all duration-500 ${
-                      currentSlide === index ? "w-12" : "w-5 group-hover:bg-white/50"
-                    }`}
-                  >
-                    {currentSlide === index && (
-                      <motion.span
-                        key={`p-${currentSlide}`}
-                        initial={{ width: "0%" }}
-                        animate={{ width: "100%" }}
-                        transition={{ duration: SLIDE_MS / 1000, ease: "linear" }}
-                        className="absolute inset-y-0 left-0 bg-white"
-                      />
-                    )}
-                  </span>
-                </button>
+                  onClick={() => setCurrentSlide(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i === currentSlide ? "w-8 bg-emerald-400" : "w-2 bg-white/30"
+                  }`}
+                  aria-label={`Go to slide ${i + 1}`}
+                />
               ))}
             </div>
           </div>
         </div>
 
-        {/* RIGHT — form (7 cols) */}
-        <div className="relative flex flex-col justify-center bg-white p-6 sm:p-10 lg:col-span-7">
-          <div className="absolute right-6 top-6 sm:right-8 sm:top-8">
-            <LangSwitch id="register-lang" tone="light" />
-          </div>
-
-          <div className="mx-auto w-full max-w-lg pt-6 lg:pt-0">
-            <div className="lg:hidden mb-4">
-              <Logo tone="dark" />
-            </div>
-
-            {isSuccess ? (
+        {/* RIGHT — registration form (7 cols) */}
+        <div className="relative flex h-full flex-col bg-white overflow-hidden lg:col-span-7">
+          {isSuccess ? (
+            <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -386,44 +453,45 @@ export default function RegisterPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </motion.div>
-            ) : (
-              <>
-                <motion.div
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="space-y-1"
-                >
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            </div>
+          ) : (
+            <>
+              {/* STATIC PINNED HEADER */}
+              <div className="shrink-0 px-6 pt-5 sm:px-10 sm:pt-7 pb-3 border-b border-slate-100 bg-white z-10 shadow-[0_4px_12px_-4px_rgba(0,0,0,0.03)]">
+                <div className="lg:hidden mb-2">
+                  <Logo tone="dark" />
+                </div>
+                <div className="space-y-0.5">
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                     {t({ bn: "নতুন অ্যাকাউন্ট তৈরি করুন", en: "Create Share Account" })}
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-500">
+                  <p className="text-xs text-slate-500">
                     {t({
-                      bn: "সেলার (বিক্রেতা) অথবা বায়ার (ক্রেতা) হিসেবে প্ল্যাটফর্মে যোগ দিন।",
-                      en: "Register to join as a Seller or Buyer.",
+                      bn: "সেলার (উদ্যোক্তা) অথবা বায়ার (বিনিয়োগকারী) হিসেবে নিবন্ধন করুন।",
+                      en: "Register to join as a Seller (Creator) or Buyer (Investor).",
                     })}
                   </p>
-                </motion.div>
+                </div>
 
-                {/* ══════════════ ROLE SELECTOR (SELLER VS BUYER) ══════════════ */}
-                <div className="mt-5 grid grid-cols-2 gap-3">
+                {/* 1. ROLE SELECTOR */}
+                <div className="mt-3 grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     onClick={() => setUserType("seller")}
-                    className={`flex items-center gap-3 rounded-2xl border p-3.5 text-left transition ${
+                    className={`flex items-center gap-2.5 rounded-xl border p-2 text-left transition ${
                       userType === "seller"
                         ? "border-emerald-500 bg-emerald-50/80 shadow-xs ring-2 ring-emerald-500/20"
                         : "border-slate-200 bg-slate-50/60 hover:bg-slate-100/70"
                     }`}
                   >
                     <div
-                      className={`grid h-10 w-10 place-items-center rounded-xl transition ${
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
                         userType === "seller"
                           ? "bg-emerald-600 text-white shadow-xs"
                           : "bg-white text-slate-500 border border-slate-200"
                       }`}
                     >
-                      <Building2 className="h-5 w-5" />
+                      <Building2 className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
@@ -431,12 +499,12 @@ export default function RegisterPage() {
                           {t({ bn: "সেলার (Seller)", en: "Seller" })}
                         </p>
                         {userType === "seller" && (
-                          <span className="grid h-4 w-4 place-items-center rounded-full bg-emerald-600 text-white">
-                            <Check className="h-3 w-3 stroke-[3]" />
+                          <span className="grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-600 text-white">
+                            <Check className="h-2.5 w-2.5 stroke-[3]" />
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate">
+                      <p className="text-[10px] text-slate-500 truncate">
                         {t({ bn: "প্রজেক্ট বিক্রয় ও শেয়ার", en: "Sell projects & shares" })}
                       </p>
                     </div>
@@ -445,20 +513,20 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={() => setUserType("buyer")}
-                    className={`flex items-center gap-3 rounded-2xl border p-3.5 text-left transition ${
+                    className={`flex items-center gap-2.5 rounded-xl border p-2 text-left transition ${
                       userType === "buyer"
                         ? "border-emerald-500 bg-emerald-50/80 shadow-xs ring-2 ring-emerald-500/20"
                         : "border-slate-200 bg-slate-50/60 hover:bg-slate-100/70"
                     }`}
                   >
                     <div
-                      className={`grid h-10 w-10 place-items-center rounded-xl transition ${
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
                         userType === "buyer"
                           ? "bg-emerald-600 text-white shadow-xs"
                           : "bg-white text-slate-500 border border-slate-200"
                       }`}
                     >
-                      <TrendingUp className="h-5 w-5" />
+                      <TrendingUp className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
@@ -466,26 +534,80 @@ export default function RegisterPage() {
                           {t({ bn: "বায়ার (Buyer)", en: "Buyer" })}
                         </p>
                         {userType === "buyer" && (
-                          <span className="grid h-4 w-4 place-items-center rounded-full bg-emerald-600 text-white">
-                            <Check className="h-3 w-3 stroke-[3]" />
+                          <span className="grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-600 text-white">
+                            <Check className="h-2.5 w-2.5 stroke-[3]" />
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate">
+                      <p className="text-[10px] text-slate-500 truncate">
                         {t({ bn: "শেয়ার ক্রয় ও বিনিয়োগ", en: "Buy shares & invest" })}
                       </p>
                     </div>
                   </button>
                 </div>
 
-                <form onSubmit={submit} className="mt-5 space-y-4">
+                {/* 2. ENTITY TYPE SELECTOR */}
+                <div className="mt-2.5">
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEntityType("individual")}
+                      className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl border text-center transition ${
+                        entityType === "individual"
+                          ? "border-emerald-500 bg-emerald-50/90 text-emerald-900 shadow-xs ring-2 ring-emerald-500/20 font-bold"
+                          : "border-slate-200 bg-slate-50/60 text-slate-700 hover:bg-slate-100/70 font-medium"
+                      }`}
+                    >
+                      <User className={`h-3.5 w-3.5 mb-0.5 ${entityType === "individual" ? "text-emerald-600" : "text-slate-400"}`} />
+                      <span className="text-[11px] leading-tight">
+                        {t({ bn: "ইন্ডিভিজুয়াল", en: "Individual" })}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEntityType("community")}
+                      className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl border text-center transition ${
+                        entityType === "community"
+                          ? "border-emerald-500 bg-emerald-50/90 text-emerald-900 shadow-xs ring-2 ring-emerald-500/20 font-bold"
+                          : "border-slate-200 bg-slate-50/60 text-slate-700 hover:bg-slate-100/70 font-medium"
+                      }`}
+                    >
+                      <Users className={`h-3.5 w-3.5 mb-0.5 ${entityType === "community" ? "text-emerald-600" : "text-slate-400"}`} />
+                      <span className="text-[11px] leading-tight">
+                        {t({ bn: "কমিউনিটি", en: "Community" })}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEntityType("organisation")}
+                      className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl border text-center transition ${
+                        entityType === "organisation"
+                          ? "border-emerald-500 bg-emerald-50/90 text-emerald-900 shadow-xs ring-2 ring-emerald-500/20 font-bold"
+                          : "border-slate-200 bg-slate-50/60 text-slate-700 hover:bg-slate-100/70 font-medium"
+                      }`}
+                    >
+                      <Building2 className={`h-3.5 w-3.5 mb-0.5 ${entityType === "organisation" ? "text-emerald-600" : "text-slate-400"}`} />
+                      <span className="text-[11px] leading-tight">
+                        {t({ bn: "অর্গানাইজেশন", en: "Organisation" })}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* FORM WITH SCROLLABLE MIDDLE & STATIC PINNED FOOTER */}
+              <form onSubmit={submit} className="flex flex-1 flex-col overflow-hidden">
+                {/* Scrollable Form Fields */}
+                <div className="flex-1 overflow-y-auto px-6 py-4 sm:px-10 space-y-4">
                   {/* Section 1: Basic Credentials */}
-                  <div className="space-y-3.5">
+                  <div className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-2">
                       {/* Name */}
                       <div className="space-y-1">
                         <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          {t({ bn: "পুরো নাম", en: "Full Name" })} <span className="text-rose-500">*</span>
+                          {t({ bn: "পূর্ণ নাম", en: "Full Name" })} <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
                           <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -496,7 +618,7 @@ export default function RegisterPage() {
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             className={inputCls}
-                            placeholder="Md. Iqbal Hossain"
+                            placeholder="e.g. Md. Rafiqul Islam"
                           />
                         </div>
                       </div>
@@ -504,7 +626,7 @@ export default function RegisterPage() {
                       {/* Phone */}
                       <div className="space-y-1">
                         <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          {t({ bn: "ফোন নম্বর", en: "Phone Number" })} <span className="text-rose-500">*</span>
+                          {t({ bn: "মোবাইল নম্বর", en: "Mobile Phone Number" })} <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
                           <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -524,7 +646,7 @@ export default function RegisterPage() {
                     {/* Email */}
                     <div className="space-y-1">
                       <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        {t({ bn: "ইমেইল", en: "Email" })} <span className="text-rose-500">*</span>
+                        {t({ bn: "ইমেইল ঠিকানা", en: "Email Address" })} <span className="text-rose-500">*</span>
                       </label>
                       <div className="relative">
                         <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -535,7 +657,7 @@ export default function RegisterPage() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className={inputCls}
-                          placeholder="name@company.com"
+                          placeholder="name@example.com"
                         />
                       </div>
                     </div>
@@ -571,7 +693,7 @@ export default function RegisterPage() {
 
                       <div className="space-y-1">
                         <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          {t({ bn: "নিশ্চিত করুন", en: "Confirm Password" })} <span className="text-rose-500">*</span>
+                          {t({ bn: "পাসওয়ার্ড নিশ্চিতকরণ", en: "Confirm Password" })} <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
                           <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -590,21 +712,26 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
-                  {/* ══════════════ SECTION 2: DYNAMIC ROLE-BASED FIELDS ══════════════ */}
-                  {userType === "seller" ? (
+                  {/* ══════════════ SECTION 2: DYNAMIC CREATOR / ENTITY DETAILS ══════════════ */}
+
+                  {/* ── 2A. INDIVIDUAL CREATOR DETAILS ── */}
+                  {entityType === "individual" && (
                     <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-3">
                       <div className="flex items-center gap-2 border-b border-emerald-100/70 pb-2 text-emerald-800">
-                        <Building2 className="h-4 w-4 text-emerald-600" />
+                        <User className="h-4 w-4 text-emerald-600" />
                         <h3 className="text-xs font-bold uppercase tracking-wider">
-                          {t({ bn: "সেলার পরিচিতি ও ব্যবসা সংক্রান্ত তথ্য", en: "Seller Business Details" })}
+                          {t({
+                            bn: "উদ্যোক্তার ব্যক্তিগত পরিচিতি (Individual Creator Details)",
+                            en: "Individual Creator Details",
+                          })}
                         </h3>
                       </div>
 
                       <div className="grid gap-3 sm:grid-cols-2">
-                        {/* NID / ID */}
+                        {/* NID */}
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-slate-700">
-                            {t({ bn: "আইডি / এনআইডি নম্বর", en: "Seller ID / NID Number" })} <span className="text-rose-500">*</span>
+                            {t({ bn: "জাতীয় পরিচয়পত্র (NID) নম্বর", en: "National ID (NID) Number" })} <span className="text-rose-500">*</span>
                           </label>
                           <div className="relative">
                             <FileBadge className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -612,77 +739,37 @@ export default function RegisterPage() {
                               type="text"
                               required
                               disabled={isSubmitting}
-                              value={sellerNid}
-                              onChange={(e) => setSellerNid(e.target.value)}
+                              value={nidNumber}
+                              onChange={(e) => setNidNumber(e.target.value)}
                               className={inputCls}
-                              placeholder="e.g. 19901234567890"
+                              placeholder="e.g. 1987654321098"
                             />
                           </div>
                         </div>
 
-                        {/* Trade License */}
+                        {/* Profession */}
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-slate-700">
-                            {t({ bn: "ট্রেড লাইসেন্স নম্বর", en: "Trade License Number" })} <span className="text-rose-500">*</span>
+                            {t({ bn: "পেশা / কর্মসংস্থান (Profession)", en: "Profession / Occupation" })}
                           </label>
                           <div className="relative">
-                            <FileBadge className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Briefcase className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             <input
                               type="text"
-                              required
                               disabled={isSubmitting}
-                              value={sellerTradeLicense}
-                              onChange={(e) => setSellerTradeLicense(e.target.value)}
+                              value={profession}
+                              onChange={(e) => setProfession(e.target.value)}
                               className={inputCls}
-                              placeholder="TRAD/DNCC/123456"
+                              placeholder="e.g. Businessman / Engineer"
                             />
                           </div>
                         </div>
                       </div>
 
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {/* MD Name */}
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-700">
-                            {t({ bn: "MD এর নাম (ব্যবস্থাপনা পরিচালক)", en: "MD Name (Managing Director)" })} <span className="text-rose-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type="text"
-                              required
-                              disabled={isSubmitting}
-                              value={sellerMdName}
-                              onChange={(e) => setSellerMdName(e.target.value)}
-                              className={inputCls}
-                              placeholder="e.g. Engr. Rafiqul Islam"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Seller Alt Phone */}
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-700">
-                            {t({ bn: "বিক্রেতার অতিরিক্ত ফোন নম্বর", en: "Seller Alternate Phone" })} <span className="text-slate-400 font-normal">({t({ bn: "ঐচ্ছিক", en: "Optional" })})</span>
-                          </label>
-                          <div className="relative">
-                            <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type="tel"
-                              disabled={isSubmitting}
-                              value={sellerPhoneAlt}
-                              onChange={(e) => setSellerPhoneAlt(e.target.value)}
-                              className={inputCls}
-                              placeholder="018xxxxxxxx"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Office Address */}
+                      {/* Present Address */}
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-slate-700">
-                          {t({ bn: "অফিস এড্রেস", en: "Office Address" })} <span className="text-rose-500">*</span>
+                          {t({ bn: "বর্তমান ঠিকানা (Present Address)", en: "Present Address" })} <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
                           <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -690,11 +777,279 @@ export default function RegisterPage() {
                             type="text"
                             required
                             disabled={isSubmitting}
-                            value={sellerOfficeAddress}
-                            onChange={(e) => setSellerOfficeAddress(e.target.value)}
+                            value={presentAddress}
+                            onChange={(e) => setPresentAddress(e.target.value)}
                             className={inputCls}
-                            placeholder="e.g. House 42, Road 11, Banani, Dhaka"
+                            placeholder="e.g. House 12, Road 5, Dhanmondi, Dhaka"
                           />
+                        </div>
+                      </div>
+
+                      {/* Alternate Phone */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">
+                          {t({ bn: "বিকল্প ফোন নম্বর (Alternate Phone)", en: "Alternate Phone Number" })}{" "}
+                          <span className="text-slate-400 font-normal">({t({ bn: "ঐচ্ছিক", en: "Optional" })})</span>
+                        </label>
+                        <div className="relative">
+                          <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="tel"
+                            disabled={isSubmitting}
+                            value={phoneAlt}
+                            onChange={(e) => setPhoneAlt(e.target.value)}
+                            className={inputCls}
+                            placeholder="018xxxxxxxx"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── 2B. COMMUNITY & REPRESENTATIVE DETAILS ── */}
+                  {entityType === "community" && (
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-3">
+                      <div className="flex items-center gap-2 border-b border-emerald-100/70 pb-2 text-emerald-800">
+                        <Users className="h-4 w-4 text-emerald-600" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider">
+                          {t({
+                            bn: "কমিউনিটি ও প্রতিনিধির তথ্য (Community & Representative Details)",
+                            en: "Community & Representative Details",
+                          })}
+                        </h3>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {/* Community Name */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "সমিতি বা ক্লাবের নাম (Community Name)", en: "Community / Group Name" })}{" "}
+                            <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            disabled={isSubmitting}
+                            value={communityName}
+                            onChange={(e) => setCommunityName(e.target.value)}
+                            className={inputNoIconCls}
+                            placeholder="e.g. Dhaka Green Investors Club"
+                          />
+                        </div>
+
+                        {/* Lead Representative Name */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "প্রধান প্রতিনিধির নাম", en: "Lead Representative Name" })}{" "}
+                            <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            disabled={isSubmitting}
+                            value={representativeName}
+                            onChange={(e) => setRepresentativeName(e.target.value)}
+                            className={inputNoIconCls}
+                            placeholder="e.g. Rafiqul Islam"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {/* Designation in Community */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "প্রতিনিধির পদবি (Designation)", en: "Designation in Community" })}{" "}
+                            <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            disabled={isSubmitting}
+                            value={communityDesignation}
+                            onChange={(e) => setCommunityDesignation(e.target.value)}
+                            className={inputNoIconCls}
+                            placeholder="e.g. President / Secretary / Convener"
+                          />
+                        </div>
+
+                        {/* Member Count */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "কমিউনিটি সদস্য সংখ্যা", en: "Total Community Members" })}{" "}
+                            <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            min={2}
+                            required
+                            disabled={isSubmitting}
+                            value={memberCount}
+                            onChange={(e) => setMemberCount(e.target.value)}
+                            className={inputNoIconCls}
+                            placeholder="e.g. 50"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {/* Community Reg No */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "সমিতি বা ক্লাবের নিবন্ধন নং", en: "Association Reg No. (Optional)" })}{" "}
+                            <span className="text-slate-400 font-normal">({t({ bn: "ঐচ্ছিক", en: "Optional" })})</span>
+                          </label>
+                          <input
+                            type="text"
+                            disabled={isSubmitting}
+                            value={communityRegNo}
+                            onChange={(e) => setCommunityRegNo(e.target.value)}
+                            className={inputNoIconCls}
+                            placeholder="e.g. REG-2024-987"
+                          />
+                        </div>
+
+                        {/* Community Office Address */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "কমিউনিটি কার্যালয় / যোগাযোগের ঠিকানা", en: "Office / Meeting Address" })}
+                          </label>
+                          <input
+                            type="text"
+                            disabled={isSubmitting}
+                            value={communityAddress}
+                            onChange={(e) => setCommunityAddress(e.target.value)}
+                            className={inputNoIconCls}
+                            placeholder="e.g. Sector 4, Uttara, Dhaka"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── 2C. ORGANISATION & SIGNATORY DETAILS ── */}
+                  {entityType === "organisation" && (
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-3">
+                      <div className="flex items-center gap-2 border-b border-emerald-100/70 pb-2 text-emerald-800">
+                        <Building2 className="h-4 w-4 text-emerald-600" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider">
+                          {t({
+                            bn: "প্রতিষ্ঠান ও অনুমোদিত প্রতিনিধির তথ্য (Organisation & Signatory Details)",
+                            en: "Organisation & Signatory Details",
+                          })}
+                        </h3>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {/* Company Name */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "প্রতিষ্ঠানের পূর্ণ নাম", en: "Company Legal Name" })} <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            disabled={isSubmitting}
+                            value={companyName}
+                            onChange={(e) => setCompanyName(e.target.value)}
+                            className={inputNoIconCls}
+                            placeholder="e.g. Apex Agrotech Limited"
+                          />
+                        </div>
+
+                        {/* Business Type */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "প্রতিষ্ঠানের ধরন", en: "Business Entity Type" })} <span className="text-rose-500">*</span>
+                          </label>
+                          <select
+                            value={businessType}
+                            onChange={(e) => setBusinessType(e.target.value)}
+                            className={inputNoIconCls}
+                          >
+                            <option value="Private Limited Company">Private Limited Company (প্রাইভেট লিমিটেড)</option>
+                            <option value="Public Limited Company">Public Limited Company (পাবলিক লিমিটেড)</option>
+                            <option value="Partnership Firm">Partnership Firm (অংশীদারি কারবার)</option>
+                            <option value="Sole Proprietorship">Sole Proprietorship (একমালিকানা প্রতিষ্ঠান)</option>
+                            <option value="NGO / Non-Profit / Trust">NGO / Non-Profit / Trust (এনজিও / ট্রাস্ট)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {/* Trade License */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "ট্রেড লাইসেন্স বা আরজেএসসি নং", en: "Trade License / RJSC Reg No." })} <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <FileBadge className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              required
+                              disabled={isSubmitting}
+                              value={tradeLicense}
+                              onChange={(e) => setTradeLicense(e.target.value)}
+                              className={inputCls}
+                              placeholder="TRAD/DNCC/123456/2025"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Authorized Signatory */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "অনুমোদিত প্রতিনিধির নাম", en: "Authorized Signatory Name" })} <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              required
+                              disabled={isSubmitting}
+                              value={signatoryName}
+                              onChange={(e) => setSignatoryName(e.target.value)}
+                              className={inputCls}
+                              placeholder="e.g. Tanvir Ahmed"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {/* Signatory Designation */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "প্রতিনিধির পদবি", en: "Signatory Designation" })} <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            disabled={isSubmitting}
+                            value={signatoryDesignation}
+                            onChange={(e) => setSignatoryDesignation(e.target.value)}
+                            className={inputNoIconCls}
+                            placeholder="e.g. Managing Director / CEO"
+                          />
+                        </div>
+
+                        {/* Office Address */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700">
+                            {t({ bn: "কার্যালয়ের ঠিকানা", en: "Office Address" })} <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              required
+                              disabled={isSubmitting}
+                              value={officeAddress}
+                              onChange={(e) => setOfficeAddress(e.target.value)}
+                              className={inputCls}
+                              placeholder="e.g. Level 7, Tower 1, Gulshan-2, Dhaka"
+                            />
+                          </div>
                         </div>
                       </div>
 
@@ -709,8 +1064,8 @@ export default function RegisterPage() {
                             <input
                               type="url"
                               disabled={isSubmitting}
-                              value={sellerWebsite}
-                              onChange={(e) => setSellerWebsite(e.target.value)}
+                              value={website}
+                              onChange={(e) => setWebsite(e.target.value)}
                               className={inputCls}
                               placeholder="https://mycompany.com"
                             />
@@ -727,8 +1082,8 @@ export default function RegisterPage() {
                             <input
                               type="url"
                               disabled={isSubmitting}
-                              value={sellerFacebook}
-                              onChange={(e) => setSellerFacebook(e.target.value)}
+                              value={facebookPage}
+                              onChange={(e) => setFacebookPage(e.target.value)}
                               className={inputCls}
                               placeholder="https://facebook.com/mycompany"
                             />
@@ -736,52 +1091,16 @@ export default function RegisterPage() {
                         </div>
                       </div>
                     </div>
-                  ) : (
+                  )}
+
+                  {/* ══════════════ SECTION 3: BUYER INVESTMENT PREFERENCES ══════════════ */}
+                  {userType === "buyer" && (
                     <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-4 space-y-3">
                       <div className="flex items-center gap-2 border-b border-sky-100/70 pb-2 text-sky-900">
                         <TrendingUp className="h-4 w-4 text-sky-600" />
                         <h3 className="text-xs font-bold uppercase tracking-wider">
-                          {t({ bn: "বায়ারের তথ্য ও বিনিয়োগ পছন্দ", en: "Buyer Preferences & Profile" })}
+                          {t({ bn: "বায়ারের বিনিয়োগ পছন্দসমূহ", en: "Buyer Investment Preferences" })}
                         </h3>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {/* Profession */}
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-700">
-                            {t({ bn: "পেশা / প্রফেশন", en: "Profession" })} <span className="text-rose-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <Briefcase className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type="text"
-                              required
-                              disabled={isSubmitting}
-                              value={buyerProfession}
-                              onChange={(e) => setBuyerProfession(e.target.value)}
-                              className={inputCls}
-                              placeholder="e.g. Doctor, Engineer, Businessman"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Designation */}
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-700">
-                            {t({ bn: "পদবী / ডেজিগনেশন", en: "Designation" })} <span className="text-slate-400 font-normal">({t({ bn: "ঐচ্ছিক", en: "Optional" })})</span>
-                          </label>
-                          <div className="relative">
-                            <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type="text"
-                              disabled={isSubmitting}
-                              value={buyerDesignation}
-                              onChange={(e) => setBuyerDesignation(e.target.value)}
-                              className={inputCls}
-                              placeholder="e.g. Senior Consultant / Manager"
-                            />
-                          </div>
-                        </div>
                       </div>
 
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -799,7 +1118,6 @@ export default function RegisterPage() {
                               onChange={(e) => setBuyerBudget(e.target.value)}
                               className={inputCls}
                             >
-                              <option value="">{t({ bn: "-- বাজেট নির্বাচন করুন --", en: "-- Select Budget Range --" })}</option>
                               <option value="50k-200k">৳ ৫০,০০০ - ২,০০,০০০ (50K - 200K)</option>
                               <option value="200k-500k">৳ ২,০০,০০০ - ৫,০০,০০০ (200K - 500K)</option>
                               <option value="500k-1500k">৳ ৫,০০,০০০ - ১৫,০০,০০০ (500K - 1.5M)</option>
@@ -823,13 +1141,12 @@ export default function RegisterPage() {
                               onChange={(e) => setBuyerPreferableCategory(e.target.value)}
                               className={inputCls}
                             >
-                              <option value="">{t({ bn: "-- ক্যাটাগরি নির্বাচন করুন --", en: "-- Select Category --" })}</option>
-                              <option value="Real Estate">Real Estate (রিয়েল এস্টেট)</option>
+                              <option value="Commercial Real Estate">Commercial Real Estate (বাণিজ্যিক রিয়েল এস্টেট)</option>
                               <option value="Agriculture & Agro">Agriculture & Agro (কৃষি ও ডেইরি)</option>
-                              <option value="Commercial Plaza">Commercial Plaza (বাণিজ্যিক স্পেস)</option>
-                              <option value="Eco Resort & Tourism">Eco Resort & Tourism (ইকো রিসোর্ট ও পর্যটন)</option>
                               <option value="Renewable Energy">Renewable Energy (নবায়নযোগ্য শক্তি)</option>
-                              <option value="Tech & Startup">Tech & Startup (আইটি ও স্টার্টআপ)</option>
+                              <option value="Hotel & Resort">Hotel & Resort (হোটেল ও রিসোর্ট)</option>
+                              <option value="Technology">Technology (প্রযুক্তি ও স্টার্টআপ)</option>
+                              <option value="Transport">Transport (পরিবহন)</option>
                             </select>
                           </div>
                         </div>
@@ -838,7 +1155,7 @@ export default function RegisterPage() {
                       {/* Interested Location */}
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-slate-700">
-                          {t({ bn: "আগ্রহী প্রজেক্ট লোকেশন / জেলা", en: "Interested Project Location" })} <span className="text-slate-400 font-normal">({t({ bn: "ঐচ্ছিক", en: "Optional" })})</span>
+                          {t({ bn: "আগ্রহী প্রজেক্ট লোকেশন / জেলা", en: "Interested Project Location" })}
                         </label>
                         <div className="relative">
                           <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -848,7 +1165,7 @@ export default function RegisterPage() {
                             value={buyerInterestedLocation}
                             onChange={(e) => setBuyerInterestedLocation(e.target.value)}
                             className={inputCls}
-                            placeholder="e.g. ঢাকা, গাজীপুর, চট্টগ্রাম, কক্সবাজার, সিলেট"
+                            placeholder="e.g. ঢাকা, চট্টগ্রাম, সিলেট, কক্সবাজার"
                           />
                         </div>
                       </div>
@@ -870,10 +1187,18 @@ export default function RegisterPage() {
                     )}
                   </AnimatePresence>
 
+                </div>
+
+                {/* STATIC PINNED FOOTER */}
+                <div className="shrink-0 px-6 py-3.5 sm:px-10 sm:py-4 border-t border-slate-100 bg-white/95 backdrop-blur-xs shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.03)]">
                   <button
                     type="submit"
-                    disabled={isSubmitting}
-                    className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-ink-950 px-6 py-3.5 text-sm font-semibold text-white shadow-xl shadow-ink-950/20 transition hover:bg-ink-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={!isFormValid || isSubmitting}
+                    className={`group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl px-6 py-3 text-sm font-semibold transition active:scale-[0.99] ${
+                      !isFormValid || isSubmitting
+                        ? "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
+                        : "bg-ink-950 text-white shadow-xl shadow-ink-950/20 hover:bg-ink-800"
+                    }`}
                   >
                     <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-sky-500 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                     <span className="relative flex items-center gap-2">
@@ -890,20 +1215,20 @@ export default function RegisterPage() {
                       )}
                     </span>
                   </button>
-                </form>
 
-                <p className="mt-5 text-center text-sm text-slate-500">
-                  {t({ bn: "ইতিমধ্যে অ্যাকাউন্ট আছে?", en: "Already have an account?" })}{" "}
-                  <Link
-                    href="/login"
-                    className="font-semibold text-emerald-600 hover:text-emerald-700"
-                  >
-                    {t({ bn: "লগইন করুন", en: "Sign in" })}
-                  </Link>
-                </p>
-              </>
-            )}
-          </div>
+                  <p className="mt-2 text-center text-xs text-slate-500">
+                    {t({ bn: "ইতিমধ্যে অ্যাকাউন্ট আছে?", en: "Already have an account?" })}{" "}
+                    <Link
+                      href="/login"
+                      className="font-semibold text-emerald-600 hover:text-emerald-700"
+                    >
+                      {t({ bn: "লগইন করুন", en: "Sign in" })}
+                    </Link>
+                  </p>
+                </div>
+              </form>
+            </>
+          )}
         </div>
       </motion.div>
     </div>

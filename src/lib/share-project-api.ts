@@ -32,14 +32,52 @@ function unwrap<T>(payload: unknown): T {
   return ("data" in root ? root.data : root) as T;
 }
 
+// Fast In-Memory Client Cache & In-Flight Request Deduplication
+const clientApiCache = new Map<string, { data: any; expiry: number }>();
+const inflightRequests = new Map<string, Promise<any>>();
+
+async function cachedGet<T>(path: string, ttlMs = 20000): Promise<T> {
+  const now = Date.now();
+  const cached = clientApiCache.get(path);
+  if (cached && cached.expiry > now) {
+    return cached.data as T;
+  }
+  const inflight = inflightRequests.get(path);
+  if (inflight) {
+    return inflight as Promise<T>;
+  }
+
+  const promise = (async () => {
+    try {
+      const response = await api.get(path);
+      const data = unwrap<T>(response.data);
+      clientApiCache.set(path, { data, expiry: Date.now() + ttlMs });
+      return data;
+    } finally {
+      inflightRequests.delete(path);
+    }
+  })();
+
+  inflightRequests.set(path, promise);
+  return promise;
+}
+
+export function clearClientProjectCache() {
+  clientApiCache.clear();
+}
+
 export async function getPublicProjects(page = 1, limit = 100) {
-  const response = await api.get(`${ROOT}/public/projects?page=${page}&limit=${limit}`);
-  return unwrap<{ data: ShareApiProject[]; meta?: { total: number; page: number; limit: number; totalPages?: number } }>(response.data);
+  return cachedGet<{ data: ShareApiProject[]; meta?: { total: number; page: number; limit: number; totalPages?: number } }>(
+    `${ROOT}/public/projects?page=${page}&limit=${limit}`,
+    20000,
+  );
 }
 
 export async function getPublicProject(uuid: string) {
-  const response = await api.get(`${ROOT}/public/projects/${encodeURIComponent(uuid)}`);
-  return unwrap<ShareApiProject>(response.data);
+  return cachedGet<ShareApiProject>(
+    `${ROOT}/public/projects/${encodeURIComponent(uuid)}`,
+    30000,
+  );
 }
 
 export async function getOwnerProjects(status?: string, page = 1, limit = 100) {
@@ -55,26 +93,32 @@ export async function getOwnerProject(uuid: string) {
 }
 
 export async function getPublicCategories() {
-  const response = await api.get(`${ROOT}/public/categories`);
-  return unwrap<Array<{ id: number; uuid: string; code: string; name: string }>>(response.data);
+  return cachedGet<Array<{ id: number; uuid: string; code: string; name: string }>>(
+    `${ROOT}/public/categories`,
+    60000,
+  );
 }
 
 export async function createOwnerProject(dto: Record<string, unknown>) {
+  clearClientProjectCache();
   const response = await api.post(`${ROOT}/owner/projects`, dto);
   return unwrap<ShareApiProject>(response.data);
 }
 
 export async function updateOwnerProject(uuid: string, dto: Record<string, unknown>) {
+  clearClientProjectCache();
   const response = await api.put(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}`, dto);
   return unwrap<ShareApiProject>(response.data);
 }
 
 export async function submitOwnerProject(uuid: string) {
+  clearClientProjectCache();
   const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/submit`);
   return unwrap<ShareApiProject>(response.data);
 }
 
 export async function resubmitOwnerProject(uuid: string) {
+  clearClientProjectCache();
   const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/resubmit`);
   return unwrap<ShareApiProject>(response.data);
 }
@@ -82,6 +126,41 @@ export async function resubmitOwnerProject(uuid: string) {
 export async function getOwnerSubmissionHistory(uuid: string) {
   const response = await api.get(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/submissions`);
   return unwrap<unknown[]>(response.data);
+}
+
+export async function requestPublishOwnerProject(uuid: string) {
+  clearClientProjectCache();
+  const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/publish-request`, {});
+  return unwrap<Record<string, unknown>>(response.data);
+}
+
+export async function unpublishOwnerProject(uuid: string) {
+  clearClientProjectCache();
+  const response = await api.post(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/unpublish`, {});
+  return unwrap<Record<string, unknown>>(response.data);
+}
+
+export async function deleteOwnerProject(uuid: string) {
+  clearClientProjectCache();
+  const response = await api.delete(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}`);
+  return unwrap<{ success?: boolean; message?: string }>(response.data);
+}
+
+export async function getOwnerProjectInvestors(uuid: string) {
+  const response = await api.get(`${ROOT}/owner/projects/${encodeURIComponent(uuid)}/investors`);
+  return unwrap<Array<{
+    id?: number | string;
+    uuid?: string;
+    code?: string;
+    investorName?: string;
+    investorEmail?: string;
+    investorPhone?: string;
+    quantity?: number;
+    totalAmount?: number | string;
+    status?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }>>(response.data);
 }
 
 export async function getShareUserProfile() {
@@ -302,3 +381,71 @@ export async function toggleWishlistApi(uuid: string): Promise<{ wishlisted: boo
     }
   }
 }
+
+/* ==================== PROJECT COMPARE APIS ==================== */
+
+export async function getCompareListApi(): Promise<any[]> {
+  try {
+    const res = await api.get('/realbizpro/api/v1/share-project/compare');
+    const data = res.data?.data || res.data;
+    if (Array.isArray(data)) {
+      try {
+        localStorage.setItem('share-project:compare-list', JSON.stringify(data));
+      } catch {}
+      return data;
+    }
+    return [];
+  } catch {
+    try {
+      const local = localStorage.getItem('share-project:compare-list');
+      return local ? JSON.parse(local) : [];
+    } catch {
+      return [];
+    }
+  }
+}
+
+export async function toggleCompareApi(projectUuid: string): Promise<{ action: 'added' | 'removed'; list: any[] }> {
+  try {
+    const res = await api.post('/realbizpro/api/v1/share-project/compare/toggle', { projectUuid });
+    const data = res.data?.data || res.data;
+    const list = Array.isArray(data?.list) ? data.list : [];
+    try {
+      localStorage.setItem('share-project:compare-list', JSON.stringify(list));
+    } catch {}
+    return { action: data?.action || 'added', list };
+  } catch (err: any) {
+    if (err?.response?.data?.message) {
+      throw new Error(err.response.data.message);
+    }
+    throw err;
+  }
+}
+
+export async function removeCompareApi(projectUuid: string): Promise<any[]> {
+  try {
+    const res = await api.delete(`/realbizpro/api/v1/share-project/compare/${encodeURIComponent(projectUuid)}`);
+    const data = res.data?.data || res.data;
+    const list = Array.isArray(data?.list) ? data.list : [];
+    try {
+      localStorage.setItem('share-project:compare-list', JSON.stringify(list));
+    } catch {}
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+export async function clearCompareApi(): Promise<void> {
+  try {
+    await api.delete('/realbizpro/api/v1/share-project/compare');
+    try {
+      localStorage.removeItem('share-project:compare-list');
+    } catch {}
+  } catch {
+    try {
+      localStorage.removeItem('share-project:compare-list');
+    } catch {}
+  }
+}
+

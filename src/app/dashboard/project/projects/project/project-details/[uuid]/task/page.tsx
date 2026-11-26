@@ -126,6 +126,7 @@ export default function TaskPage() {
       {/* Task Add Modal */}
       {isAddModalOpen && (
         <TaskAddModal 
+          existingTasks={tasks}
           onClose={() => setIsAddModalOpen(false)} 
           onSuccess={() => {
             setIsAddModalOpen(false);
@@ -138,7 +139,7 @@ export default function TaskPage() {
 }
 
 // ---------- Task Add Modal (API Integration) ----------
-function TaskAddModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
+function TaskAddModal({ onClose, onSuccess, existingTasks = [] }: { onClose: () => void; onSuccess: () => void; existingTasks?: Task[] }) {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -196,7 +197,7 @@ function TaskAddModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: 
             <label className="block text-xs text-gray-600 mb-1">Under</label>
             <PredictiveSearchSelect
               placeholder="Select Task..."
-              options={tasks.map((t) => ({ value: t.uuid, label: t.taskName }))}
+              options={existingTasks.map((t: Task) => ({ value: t.uuid, label: t.taskName }))}
               value=""
               onChange={() => {}}
             />

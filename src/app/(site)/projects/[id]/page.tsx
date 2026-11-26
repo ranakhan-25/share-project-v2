@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useLang } from "@/lib/i18n";
+import { getProjectDefaultImage } from "@/lib/project-defaults";
 import {
   getPublicProject,
   requestPublicInvestment,
@@ -124,7 +125,7 @@ export default function ProjectDetailsPage() {
           image:
             row.thumbnailUrl ||
             row.images?.[0]?.url ||
-            "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=85",
+            getProjectDefaultImage(row.category?.name),
           pricePerShare: Number(row.pricePerShare || 0),
           totalShares: Number(row.totalShares || 0),
           soldShares: 0,
@@ -262,8 +263,54 @@ export default function ProjectDetailsPage() {
 
   if (!project) {
     return (
-      <main className="min-h-[60vh] pt-28 text-center text-sm text-slate-500">
-        {t({ bn: "প্রজেক্ট লোড হচ্ছে...", en: "Loading project details..." })}
+      <main className="min-h-screen bg-slate-50 pb-20 pt-28">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          {/* Back button skeleton */}
+          <div className="mb-5 h-5 w-24 animate-pulse rounded bg-slate-200" />
+
+          <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
+            {/* Banner skeleton */}
+            <div className="relative h-[280px] sm:h-[420px] w-full animate-pulse bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200">
+              <div className="absolute bottom-0 left-0 p-6 sm:p-10 space-y-3">
+                <div className="h-6 w-32 rounded-full bg-slate-300" />
+                <div className="h-10 w-72 sm:w-96 rounded-xl bg-slate-300" />
+                <div className="h-4 w-48 rounded bg-slate-300" />
+              </div>
+            </div>
+
+            <div className="grid gap-8 p-6 lg:grid-cols-[1fr_420px] sm:p-10">
+              {/* Left Column Skeleton */}
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <div className="h-6 w-40 rounded bg-slate-200 animate-pulse" />
+                  <div className="h-4 w-full rounded bg-slate-100 animate-pulse" />
+                  <div className="h-4 w-5/6 rounded bg-slate-100 animate-pulse" />
+                  <div className="h-4 w-2/3 rounded bg-slate-100 animate-pulse" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-24 rounded-2xl bg-slate-100 animate-pulse p-4 space-y-2">
+                      <div className="h-3 w-16 rounded bg-slate-200" />
+                      <div className="h-6 w-20 rounded bg-slate-300" />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="h-40 rounded-3xl bg-slate-100 animate-pulse" />
+              </div>
+
+              {/* Right Column Skeleton */}
+              <div className="space-y-4 rounded-3xl border border-slate-200 p-6 bg-slate-50/50">
+                <div className="h-6 w-48 rounded bg-slate-200 animate-pulse" />
+                <div className="h-12 w-full rounded-2xl bg-slate-200 animate-pulse" />
+                <div className="h-10 w-full rounded-xl bg-slate-100 animate-pulse" />
+                <div className="h-10 w-full rounded-xl bg-slate-100 animate-pulse" />
+                <div className="h-12 w-full rounded-2xl bg-emerald-100 animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
     );
   }

@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Scale,
   Search,
+  Share2,
   ShieldCheck,
   Sparkles,
   Table as TableIcon,
@@ -40,11 +41,16 @@ import {
   getPublicCategories,
   getWishlistUuids,
   toggleWishlistApi,
+  getCompareListApi,
+  toggleCompareApi,
+  removeCompareApi,
+  clearCompareApi,
   type ShareApiProject,
 } from "@/lib/share-project-api";
+import { ShareProjectModal } from "@/components/share/ShareProjectModal";
+import { getProjectDefaultImage } from "@/lib/project-defaults";
 
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=900&q=80";
+const FALLBACK_IMAGE = getProjectDefaultImage();
 
 type ProjectItem = ShareApiProject & {
   categoryName?: string;
@@ -71,7 +77,10 @@ export default function AllProjectsDashboardPage() {
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [compareWarning, setCompareWarning] = useState("");
 
-  // Load initial projects, categories & wishlist
+  // Share modal state
+  const [sharingProject, setSharingProject] = useState<ProjectItem | null>(null);
+
+  // Load initial projects, categories, wishlist & compare list
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -80,18 +89,28 @@ export default function AllProjectsDashboardPage() {
       getPublicProjects(1, 100).catch(() => ({ data: [] })),
       getPublicCategories().catch(() => []),
       getWishlistUuids().catch(() => []),
+      getCompareListApi().catch(() => []),
     ])
-      .then(([projRes, catRes, wishRes]) => {
+      .then(([projRes, catRes, wishRes, compRes]) => {
         if (!active) return;
         const rawList = Array.isArray(projRes?.data) ? projRes.data : Array.isArray(projRes) ? projRes : [];
         const mapped: ProjectItem[] = rawList.map((p: any) => ({
           ...p,
           categoryName: p.category?.name || "General",
-          displayImage: p.thumbnailUrl || p.images?.[0]?.url || FALLBACK_IMAGE,
+          displayImage: p.thumbnailUrl || p.images?.[0]?.url || getProjectDefaultImage(p.category?.name),
         }));
         setProjects(mapped);
         setCategories(catRes || []);
         setWishlist(new Set(wishRes || []));
+
+        if (Array.isArray(compRes) && compRes.length > 0) {
+          const compMapped: ProjectItem[] = compRes.map((p: any) => ({
+            ...p,
+            categoryName: p.category?.name || "General",
+            displayImage: p.thumbnailUrl || p.images?.[0]?.url || getProjectDefaultImage(p.category?.name),
+          }));
+          setCompareList(compMapped);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -130,25 +149,66 @@ export default function AllProjectsDashboardPage() {
   };
 
   // Handle Project Compare Select / Deselect (Max 4)
-  const handleToggleCompare = (project: ProjectItem) => {
+  const handleToggleCompare = async (project: ProjectItem) => {
     const isSelected = compareList.some((p) => p.uuid === project.uuid);
+    if (!isSelected && compareList.length >= 4) {
+      setCompareWarning(
+        t({
+          bn: "একসাথে সর্বোচ্চ ৪টি প্রজেক্ট তুলনা করা যাবে।",
+          en: "You can compare a maximum of 4 projects at a time.",
+        })
+      );
+      setTimeout(() => setCompareWarning(""), 3500);
+      return;
+    }
+
+    // Optimistic update
+    const previous = [...compareList];
     if (isSelected) {
       setCompareList(compareList.filter((p) => p.uuid !== project.uuid));
-      setCompareWarning("");
     } else {
-      if (compareList.length >= 4) {
-        setCompareWarning(
-          t({
-            bn: "একসাথে সর্বোচ্চ ৪টি প্রজেক্ট তুলনা করা যাবে।",
-            en: "You can compare a maximum of 4 projects at a time.",
-          })
-        );
-        setTimeout(() => setCompareWarning(""), 3500);
-        return;
-      }
       setCompareList([...compareList, project]);
-      setCompareWarning("");
     }
+    setCompareWarning("");
+
+    // Backend sync
+    try {
+      const res = await toggleCompareApi(project.uuid);
+      if (Array.isArray(res.list)) {
+        const synced: ProjectItem[] = res.list.map((p: any) => ({
+          ...p,
+          categoryName: p.category?.name || "General",
+          displayImage: p.thumbnailUrl || p.images?.[0]?.url || getProjectDefaultImage(p.category?.name),
+        }));
+        setCompareList(synced);
+      }
+    } catch (err: any) {
+      // Rollback on limit error
+      setCompareList(previous);
+      if (err?.message) {
+        setCompareWarning(err.message);
+        setTimeout(() => setCompareWarning(""), 3500);
+      }
+    }
+  };
+
+  // Remove single project from compare
+  const handleRemoveCompare = async (projectUuid: string) => {
+    const remaining = compareList.filter((item) => item.uuid !== projectUuid);
+    setCompareList(remaining);
+    if (remaining.length === 0) setIsCompareOpen(false);
+    try {
+      await removeCompareApi(projectUuid);
+    } catch {}
+  };
+
+  // Clear all compare
+  const handleClearCompare = async () => {
+    setCompareList([]);
+    setIsCompareOpen(false);
+    try {
+      await clearCompareApi();
+    } catch {}
   };
 
   // Filtered & Searched Projects
@@ -457,6 +517,16 @@ export default function AllProjectsDashboardPage() {
                     >
                       <Heart className={`h-4 w-4 ${isWishlisted ? "fill-white" : ""}`} />
                     </button>
+
+                    {/* Share Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSharingProject(p)}
+                      title={t({ bn: "প্রজেক্ট শেয়ার করুন", en: "Share project" })}
+                      className="grid h-8.5 w-8.5 place-items-center rounded-full bg-white/80 backdrop-blur-md text-slate-700 hover:bg-white hover:text-blue-600 transition"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </button>
                   </div>
 
                   {/* Location & Title over image */}
@@ -651,6 +721,15 @@ export default function AllProjectsDashboardPage() {
                             <Heart className={`h-4 w-4 ${isWishlisted ? "fill-rose-500" : ""}`} />
                           </button>
 
+                          <button
+                            type="button"
+                            onClick={() => setSharingProject(p)}
+                            className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 hover:bg-slate-50 transition"
+                            title={t({ bn: "শেয়ার করুন", en: "Share project" })}
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </button>
+
                           <Link
                             href={`/projects/${p.uuid}`}
                             className="inline-flex items-center gap-1 rounded-lg bg-ink-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-ink-800 transition"
@@ -787,7 +866,7 @@ export default function AllProjectsDashboardPage() {
 
                 <button
                   type="button"
-                  onClick={() => setCompareList([])}
+                  onClick={handleClearCompare}
                   className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
                 >
                   {t({ bn: "সব মুছুন", en: "Clear" })}
@@ -840,7 +919,7 @@ export default function AllProjectsDashboardPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setCompareList([])}
+                    onClick={handleClearCompare}
                     className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white"
                   >
                     {t({ bn: "রিসেট", en: "Reset" })}
@@ -874,11 +953,7 @@ export default function AllProjectsDashboardPage() {
                         {/* Remove item button */}
                         <button
                           type="button"
-                          onClick={() => {
-                            const remaining = compareList.filter((item) => item.uuid !== p.uuid);
-                            setCompareList(remaining);
-                            if (remaining.length === 0) setIsCompareOpen(false);
-                          }}
+                          onClick={() => handleRemoveCompare(p.uuid)}
                           className="absolute right-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white hover:bg-rose-600 transition"
                           title="Remove from comparison"
                         >
@@ -973,6 +1048,13 @@ export default function AllProjectsDashboardPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Share Project Modal */}
+      <ShareProjectModal
+        open={!!sharingProject}
+        onClose={() => setSharingProject(null)}
+        project={sharingProject}
+      />
     </div>
   );
 }

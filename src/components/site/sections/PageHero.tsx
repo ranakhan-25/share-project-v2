@@ -104,7 +104,7 @@ export function PageHero({
   const { t } = useLang();
   return (
     // 🎯 সেকশন ব্যাকগ্রাউন্ড ও টেক্সট কালার আপডেট করা হয়েছে
-    <section className="relative isolate overflow-hidden bg-white pb-24 pt-36 text-ink-950 sm:pb-28 sm:pt-44">
+    <section className="relative isolate overflow-hidden bg-white pb-8 pt-24 text-ink-950 sm:pb-10 sm:pt-28">
       <div className="bg-grid absolute inset-0 -z-10 opacity-[0.15]" />
       <div
         className={`absolute -z-10 h-[30rem] w-[30rem] rounded-full blur-[120px] ${

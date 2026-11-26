@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Edit3, Trash2, Loader2, X, ChevronLeft, ChevronRight } from "lucide-react";
 import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 import PredictiveSearchInput from "@/components/ui/PredictiveSearchInput";
-import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import { getStoredAccessToken, getStoredUser, type StoredUser } from "@/lib/admin-auth/adminAuthStorage";
 
 type ApiRow = Record<string, unknown> & { uuid: string };
 

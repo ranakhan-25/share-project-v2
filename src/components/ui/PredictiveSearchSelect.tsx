@@ -15,6 +15,7 @@ export interface PredictiveSearchSelectProps {
   value: string | string[];
   onChange: (value: any) => void;
   placeholder?: string;
+  searchPlaceholder?: string;
   disabled?: boolean;
   required?: boolean;
   className?: string;

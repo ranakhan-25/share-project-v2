@@ -57,13 +57,13 @@ function SpotlightCard({ children }: { children: React.ReactNode }) {
 export function FeatureGrid() {
   const { t } = useLang();
   return (
-    <section className="bg-white py-10 sm:py-32">
+    <section className="bg-white py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <SectionHeading
           eyebrow={{ bn: "মূল ফিচার", en: "Core features" }}
           title={{ bn: "শেয়ার ব্যবস্থাপনার সবকিছু, একটি প্ল্যাটফর্মে", en: "Everything for share management, on one platform" }}
         />
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 sm:mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f, i) => (
             <Reveal key={i} delay={(i % 3) * 0.1}>
               <SpotlightCard>
@@ -114,13 +114,13 @@ export function LifecycleTabs() {
   const [active, setActive] = useState(STAGES[0].id);
   const stage = STAGES.find((s) => s.id === active)!;
   return (
-    <section className="relative overflow-hidden bg-slate-50 py-24 sm:py-32">
+    <section className="relative overflow-hidden bg-slate-50 py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <SectionHeading
           eyebrow={{ bn: "শেয়ারের জীবনচক্র", en: "Share lifecycle" }}
           title={{ bn: "বরাদ্দ থেকে রিওয়ার্ড — প্রতিটি ধাপ নিয়ন্ত্রণে", en: "From assignment to reward — every step under control" }}
         />
-        <div className="mx-auto mt-12 flex max-w-2xl justify-center">
+        <div className="mx-auto mt-6 sm:mt-8 flex max-w-2xl justify-center">
           <div className="relative flex w-full gap-1 rounded-full bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
             {STAGES.map((s) => (
               <button
@@ -137,7 +137,7 @@ export function LifecycleTabs() {
           </div>
         </div>
 
-        <div className="mt-12 overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
+        <div className="mt-6 sm:mt-8 overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
           <AnimatePresence mode="wait">
             <motion.div
               key={stage.id}
@@ -215,7 +215,7 @@ export function SecurityCta() {
     { icon: Users, text: { bn: "রোল-ভিত্তিক অ্যাক্সেস", en: "Role-based access" } },
   ];
   return (
-    <section className="relative overflow-hidden bg-ink-950 py-24 text-white sm:py-32">
+    <section className="relative overflow-hidden bg-ink-950 py-10 text-white sm:py-14">
       <div className="bg-grid absolute inset-0 opacity-70" />
       <div className="absolute -left-32 top-10 h-96 w-96 rounded-full bg-emerald-500/20 blur-[110px]" />
       <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-5 sm:px-8 lg:grid-cols-2">

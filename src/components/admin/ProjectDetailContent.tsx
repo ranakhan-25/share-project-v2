@@ -180,6 +180,8 @@ export function ProjectDetailContent({
                     ? "bg-sky-100 text-sky-800"
                     : status === "approved"
                     ? "bg-emerald-100 text-emerald-800"
+                    : status === "publish_requested"
+                    ? "bg-purple-100 text-purple-800"
                     : status === "rejected"
                     ? "bg-rose-100 text-rose-800"
                     : status === "pending"
@@ -187,7 +189,7 @@ export function ProjectDetailContent({
                     : "bg-slate-100 text-slate-700"
                 }`}
               >
-                {status}
+                {status === "publish_requested" ? "Requested For Publish" : status}
               </span>
             </div>
 
@@ -232,7 +234,7 @@ export function ProjectDetailContent({
               </>
             )}
 
-            {["approved", "unpublished"].includes(status) && (
+            {["approved", "unpublished", "publish_requested"].includes(status) && (
               <button
                 disabled={actionLoading}
                 onClick={handlePublish}
