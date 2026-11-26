@@ -57,6 +57,7 @@ export default function ProjectsPage() {
   const pageSize = 9;
 
   useEffect(() => {
+    let active = true;
     const API_BASE =
       process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 
@@ -72,7 +73,11 @@ export default function ProjectsPage() {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => {
+      try {
+        controller.abort();
+      } catch {}
+    }, 10000);
 
     fetch(
       `${API_BASE}/realbizpro/api/v1/share-project/public/projects?page=${currentPage}&limit=${pageSize}`,
@@ -80,6 +85,7 @@ export default function ProjectsPage() {
     )
       .then((res) => (res.ok ? res.json() : null))
       .then((payload: unknown) => {
+        if (!active) return;
         clearTimeout(timeoutId);
         const root =
           payload && typeof payload === "object"
@@ -147,17 +153,22 @@ export default function ProjectsPage() {
         setTotalPages(pages);
       })
       .catch((err) => {
-        if (err.name === "AbortError") return;
+        if (!active) return;
+        if (err?.name === "AbortError") return;
         if (!cached) {
           setOwnerPublished([]);
           setTotalProjects(0);
           setTotalPages(1);
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
 
     return () => {
-      controller.abort();
+      active = false;
       clearTimeout(timeoutId);
     };
   }, [currentPage]);
