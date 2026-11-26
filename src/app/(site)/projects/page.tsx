@@ -58,8 +58,15 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     let active = true;
-    const API_BASE =
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
+    const hostname =
+      typeof window !== "undefined" && window.location.hostname
+        ? window.location.hostname
+        : "localhost";
+    let API_BASE =
+      process.env.NEXT_PUBLIC_API_BASE_URL || `http://${hostname}:5002`;
+    if (API_BASE.includes("localhost") && hostname !== "localhost") {
+      API_BASE = API_BASE.replace("localhost", hostname);
+    }
 
     // Instant SWR cache retrieval
     const cached = projectsPageCache.get(currentPage);
@@ -504,6 +511,18 @@ export default function ProjectsPage() {
                     en: "Please try another keyword or filter",
                   })}
                 </p>
+                {(query || category !== "all") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery("");
+                      setCategory("all");
+                    }}
+                    className="mt-4 inline-flex items-center gap-1 rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+                  >
+                    {t({ bn: "ফিল্টার সরান", en: "Clear filters" })}
+                  </button>
+                )}
               </div>
             ) : null}
             {filtered.map((project) => {
@@ -664,25 +683,6 @@ export default function ProjectsPage() {
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </nav>
-            </div>
-          )}
-          {!loading && filtered.length === 0 && (
-            <div className="mt-8 rounded-[28px] border border-dashed border-slate-300 bg-white py-16 text-center">
-              <p className="font-bold text-slate-700">
-                {t({
-                  bn: "কোনো প্রজেক্ট পাওয়া যায়নি",
-                  en: "No projects found",
-                })}
-              </p>
-              <button
-                onClick={() => {
-                  setQuery("");
-                  setCategory("all");
-                }}
-                className="mt-4 text-sm font-semibold text-emerald-600"
-              >
-                {t({ bn: "ফিল্টার সরান", en: "Clear filters" })}
-              </button>
             </div>
           )}
         </div>
