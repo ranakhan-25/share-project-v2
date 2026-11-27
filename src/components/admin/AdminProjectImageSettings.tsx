@@ -13,6 +13,7 @@ import {
   Layers,
   Building2,
   CheckCircle2,
+  Search,
 } from "lucide-react";
 import {
   BASE_GLOBAL_DEFAULT_IMAGE,
@@ -48,6 +49,7 @@ export function AdminProjectImageSettings() {
   const [projectThumbInputs, setProjectThumbInputs] = useState<Record<string, string>>({});
   const [savingProjectUuid, setSavingProjectUuid] = useState<string | null>(null);
   const [applyingDefaults, setApplyingDefaults] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
 
   const loadProjectsForImages = async () => {
     try {
@@ -670,13 +672,38 @@ export function AdminProjectImageSettings() {
           </button>
         </div>
 
+        {/* Search Input for Per-Project Images */}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={projectSearch}
+            onChange={(e) => setProjectSearch(e.target.value)}
+            placeholder={t({
+              bn: "প্রজেক্টের নাম, কোড, লোকেশন বা ক্যাটাগরি দিয়ে খুঁজুন...",
+              en: "Search project by name, code, location or category...",
+            })}
+            className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-xs text-slate-800 outline-none transition focus:border-emerald-500 focus:bg-white"
+          />
+        </div>
+
         <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-100">
-          {projectsList.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400">
-              {t({ bn: "কোনো প্রজেক্ট পাওয়া যায়নি", en: "No projects found" })}
-            </div>
-          ) : (
-            projectsList.map((proj) => {
+          {(() => {
+            const q = projectSearch.trim().toLowerCase();
+            const filtered = projectsList.filter((proj) => {
+              if (!q) return true;
+              return `${proj.name || ""} ${proj.code || ""} ${proj.location || ""} ${proj.category?.name || ""}`
+                .toLowerCase()
+                .includes(q);
+            });
+            if (filtered.length === 0) {
+              return (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  {t({ bn: "কোনো প্রজেক্ট পাওয়া যায়নি", en: "No projects found" })}
+                </div>
+              );
+            }
+            return filtered.map((proj) => {
               const uuid = String(proj.uuid || "");
               const hasCustomImage = Boolean(String(proj.thumbnailUrl || "").trim());
               const currentInput = projectThumbInputs[uuid] ?? String(proj.thumbnailUrl || "");
@@ -770,8 +797,8 @@ export function AdminProjectImageSettings() {
                   </div>
                 </div>
               );
-            })
-          )}
+            });
+          })()}
         </div>
       </div>
     </div>

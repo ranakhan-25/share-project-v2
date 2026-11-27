@@ -960,7 +960,7 @@ export default function ShareProjectAdminDashboardPage() {
 
       {/* Top spacing because Navbar is fixed */}
       <div className="pt-20">
-        <div className="mx-auto flex max-w-7xl min-h-[calc(100vh-5rem)] px-5 sm:px-8">
+        <div className="mx-auto flex max-w-7xl min-h-[calc(100vh-5rem)] lg:h-[calc(100vh-5rem)] lg:overflow-hidden px-5 sm:px-8">
           {/* Mobile Sidebar Overlay */}
           {isMobileSidebarOpen && (
             <div
@@ -971,7 +971,7 @@ export default function ShareProjectAdminDashboardPage() {
 
           {/* ==================== 2. LEFT SIDEBAR ==================== */}
           <aside
-            className={`fixed inset-y-0 left-0 top-20 z-40 flex w-64 shrink-0 flex-col border-r lg:border-l border-slate-200 bg-white transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+            className={`fixed inset-y-0 left-0 top-20 z-40 flex w-64 shrink-0 flex-col border-r lg:border-l border-slate-200 bg-white transition-transform duration-300 ease-in-out lg:static lg:h-full lg:overflow-y-auto lg:translate-x-0 ${
               isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
             }`}
           >
@@ -1055,9 +1055,9 @@ export default function ShareProjectAdminDashboardPage() {
           </aside>
 
           {/* ==================== 3. MAIN DASHBOARD CONTENT ==================== */}
-          <div className="flex flex-1 flex-col min-w-0 lg:border-r border-slate-200">
+          <div className="flex flex-1 flex-col min-w-0 lg:h-full lg:overflow-hidden lg:border-r border-slate-200">
             {/* Top Bar with Mobile Menu Toggle & Controls */}
-            <div className="flex h-12 items-center justify-between border-b border-slate-200 bg-white/70 px-4 sm:px-6">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200 bg-white/70 px-4 sm:px-6">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1107,7 +1107,7 @@ export default function ShareProjectAdminDashboardPage() {
             </div>
 
             {/* Content Area */}
-            <main className="flex-1 p-4 sm:p-6 lg:p-8">
+            <main className="flex-1 lg:overflow-y-auto p-4 sm:p-6 lg:p-8">
               {error && (
                 <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
