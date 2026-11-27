@@ -117,14 +117,14 @@ export function getProjectDefaultImage(category?: string, index: number = 0): st
     if (cat.includes(key.toLowerCase()) && url) return url;
   }
 
-  // 2. Check admin global default image
-  const globalCustom = getAdminCustomDefaultImage();
-  if (globalCustom) return globalCustom;
-
-  // 3. Check built-in category mapping
+  // 2. Check built-in category mapping so distinct categories keep distinct images
   for (const [key, url] of Object.entries(CATEGORY_DEFAULT_IMAGES)) {
     if (cat.includes(key)) return url;
   }
+
+  // 3. Check admin global default image (for uncategorized / fallback projects)
+  const globalCustom = getAdminCustomDefaultImage();
+  if (globalCustom) return globalCustom;
 
   // 4. Default fallback rotation
   return FALLBACK_PROJECT_IMAGES[index % FALLBACK_PROJECT_IMAGES.length] || BASE_GLOBAL_DEFAULT_IMAGE;
