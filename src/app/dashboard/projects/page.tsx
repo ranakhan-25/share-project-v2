@@ -52,6 +52,17 @@ import { getProjectDefaultImage } from "@/lib/project-defaults";
 
 const FALLBACK_IMAGE = getProjectDefaultImage();
 
+function resolveProjectImage(p: any): string {
+  const apiBase = (
+    typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_BASE_URL
+      ? process.env.NEXT_PUBLIC_API_BASE_URL
+      : "http://localhost:5002"
+  ).replace(/\/+$/, "");
+  const raw = String(p?.thumbnailUrl || p?.images?.[0]?.url || "").trim();
+  if (!raw) return getProjectDefaultImage(p?.category?.name);
+  return raw.startsWith("/") ? `${apiBase}${raw}` : raw;
+}
+
 type ProjectItem = ShareApiProject & {
   categoryName?: string;
   displayImage?: string;
@@ -97,7 +108,7 @@ export default function AllProjectsDashboardPage() {
         const mapped: ProjectItem[] = rawList.map((p: any) => ({
           ...p,
           categoryName: p.category?.name || "General",
-          displayImage: p.thumbnailUrl || p.images?.[0]?.url || getProjectDefaultImage(p.category?.name),
+          displayImage: resolveProjectImage(p),
         }));
         setProjects(mapped);
         setCategories(catRes || []);
@@ -107,7 +118,7 @@ export default function AllProjectsDashboardPage() {
           const compMapped: ProjectItem[] = compRes.map((p: any) => ({
             ...p,
             categoryName: p.category?.name || "General",
-            displayImage: p.thumbnailUrl || p.images?.[0]?.url || getProjectDefaultImage(p.category?.name),
+            displayImage: resolveProjectImage(p),
           }));
           setCompareList(compMapped);
         }
@@ -178,7 +189,7 @@ export default function AllProjectsDashboardPage() {
         const synced: ProjectItem[] = res.list.map((p: any) => ({
           ...p,
           categoryName: p.category?.name || "General",
-          displayImage: p.thumbnailUrl || p.images?.[0]?.url || getProjectDefaultImage(p.category?.name),
+          displayImage: resolveProjectImage(p),
         }));
         setCompareList(synced);
       }
@@ -472,6 +483,9 @@ export default function AllProjectsDashboardPage() {
                     fill
                     className="object-cover transition duration-500 group-hover:scale-105"
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    onError={(e) => {
+                      e.currentTarget.src = getProjectDefaultImage(p.categoryName);
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
@@ -656,6 +670,9 @@ export default function AllProjectsDashboardPage() {
                               alt={p.name}
                               fill
                               className="object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = getProjectDefaultImage(p.categoryName);
+                              }}
                             />
                           </div>
                           <div className="min-w-0 max-w-xs">
@@ -967,6 +984,9 @@ export default function AllProjectsDashboardPage() {
                             alt={p.name}
                             fill
                             className="object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = getProjectDefaultImage(p.categoryName);
+                            }}
                           />
                           <span className="absolute left-2.5 bottom-2.5 rounded-full bg-black/60 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-md">
                             {p.categoryName}
