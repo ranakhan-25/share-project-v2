@@ -727,9 +727,9 @@ export default function CreatePublicProjectPage() {
                   max={100}
                   step="0.1"
                   type="number"
-                  placeholder="18.5"
-                  value={form.expectedAnnualReturn || ""}
-                  onChange={(e) => setForm({ ...form, expectedAnnualReturn: Number(e.target.value) })}
+                  placeholder="0 (Optional)"
+                  value={form.expectedAnnualReturn ?? ""}
+                  onChange={(e) => setForm({ ...form, expectedAnnualReturn: e.target.value === "" ? 0 : Number(e.target.value) })}
                   className={inputStyle}
                 />
               </div>

@@ -48,13 +48,18 @@ export const showAlert = {
     });
   },
 
-  confirm: async (title: string, text: string, confirmButtonText = "Confirm") => {
+  confirm: async (
+    title: string,
+    text = "",
+    confirmButtonText = "Confirm",
+    confirmButtonColor = "#059669",
+  ) => {
     const result = await Swal.fire({
       title,
-      text,
+      text: text || undefined,
       icon: "question",
       showCancelButton: true,
-      confirmButtonColor: "#0000F2",
+      confirmButtonColor,
       cancelButtonColor: "#64748b",
       confirmButtonText,
       cancelButtonText: "Cancel",
@@ -67,5 +72,38 @@ export const showAlert = {
       },
     });
     return result.isConfirmed;
+  },
+
+  prompt: async (
+    title: string,
+    inputLabel: string,
+    placeholder = "Enter details...",
+    confirmButtonText = "Submit",
+  ): Promise<string | null> => {
+    const result = await Swal.fire({
+      title,
+      input: "textarea",
+      inputLabel,
+      inputPlaceholder: placeholder,
+      showCancelButton: true,
+      confirmButtonColor: "#e11d48",
+      cancelButtonColor: "#64748b",
+      confirmButtonText,
+      cancelButtonText: "Cancel",
+      background: "#ffffff",
+      color: "#0f172a",
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return "Please provide a reason!";
+        }
+        return null;
+      },
+      customClass: {
+        popup: "rounded-xl shadow-2xl border border-slate-100",
+        confirmButton: "px-5 py-2 rounded-lg font-medium text-white shadow-sm",
+        cancelButton: "px-5 py-2 rounded-lg font-medium text-white shadow-sm",
+      },
+    });
+    return result.isConfirmed && result.value ? String(result.value).trim() : null;
   },
 };

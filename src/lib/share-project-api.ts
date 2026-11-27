@@ -449,3 +449,85 @@ export async function clearCompareApi(): Promise<void> {
   }
 }
 
+/* ==================== VIEW LOGS, FAVORITES & OWNER LEADS ==================== */
+
+export interface ProjectViewGroup {
+  key: string;
+  projectUuid: string;
+  projectName: string;
+  projectCode: string;
+  projectLocation: string;
+  allowOwnerLeadView: boolean;
+  viewerId: number | null;
+  viewerName: string;
+  viewerEmail: string;
+  viewerPhone: string;
+  visitorKey: string;
+  viewCount: number;
+  isFavorited: boolean;
+  firstViewedAt: string;
+  lastViewedAt: string;
+  timestamps: { viewedAt: string; ipAddress: string | null }[];
+}
+
+export interface ProjectFavoriteRecord {
+  uuid: string;
+  projectUuid?: string;
+  projectName?: string;
+  projectCode?: string;
+  projectLocation?: string;
+  allowOwnerLeadView?: boolean;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  favoritedAt: string;
+}
+
+export async function recordPublicProjectView(
+  projectUuid: string,
+  payload: {
+    viewerId?: number;
+    visitorKey?: string;
+    viewerName?: string;
+    viewerEmail?: string;
+    viewerPhone?: string;
+  },
+) {
+  try {
+    const res = await api.post(
+      `${ROOT}/public/projects/${encodeURIComponent(projectUuid)}/view`,
+      payload,
+    );
+    return unwrap<{ recorded: boolean; viewedAt: string }>(res.data);
+  } catch {
+    return { recorded: false, viewedAt: "" };
+  }
+}
+
+export async function toggleProjectFavoriteApi(projectUuid: string): Promise<{ favorited: boolean }> {
+  const res = await api.post(`${ROOT}/favorites/toggle`, { projectUuid });
+  const data = unwrap<{ favorited: boolean }>(res.data);
+  return { favorited: Boolean(data?.favorited) };
+}
+
+export async function getProjectFavoriteStatusApi(projectUuid: string): Promise<boolean> {
+  try {
+    const res = await api.get(`${ROOT}/favorites/status/${encodeURIComponent(projectUuid)}`);
+    const data = unwrap<{ favorited: boolean }>(res.data);
+    return Boolean(data?.favorited);
+  } catch {
+    return false;
+  }
+}
+
+export async function getOwnerProjectInterestedLeads(projectUuid: string) {
+  const res = await api.get(`${ROOT}/user/projects/${encodeURIComponent(projectUuid)}/interested-leads`);
+  return unwrap<{
+    permitted: boolean;
+    views: ProjectViewGroup[];
+    favorites: ProjectFavoriteRecord[];
+  }>(res.data);
+}
+
+

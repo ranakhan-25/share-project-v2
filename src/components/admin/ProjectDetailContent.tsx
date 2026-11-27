@@ -35,6 +35,7 @@ import {
   type InvestmentRecord,
   type ShareProjectRecord,
 } from "@/lib/admin-share-project-api";
+import { showAlert } from "@/lib/swal";
 
 function formatDate(value?: string | null) {
   if (!value) return "-";
@@ -65,13 +66,21 @@ export function ProjectDetailContent({
   const status = String(project.status || "draft").toLowerCase();
 
   async function handleApprove() {
-    if (!project?.uuid || !window.confirm("Approve this share project?")) return;
+    if (!project?.uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Approve Share Project?",
+      `Approve "${project.name}" so the seller can request publishing?`,
+      "Yes, Approve",
+      "#059669",
+    );
+    if (!confirmed) return;
     setActionLoading(true);
     try {
       await approveProject(project.uuid);
+      await showAlert.success("Approved!", "Project has been approved.");
       if (onRefresh) await onRefresh();
     } catch (err: any) {
-      alert(err?.message || "Approve failed");
+      await showAlert.error("Approval Failed", err?.message || "Approve failed");
     } finally {
       setActionLoading(false);
     }
@@ -85,9 +94,10 @@ export function ProjectDetailContent({
       await rejectProject(project.uuid, rejectionReason.trim());
       setRejecting(false);
       setRejectionReason("");
+      await showAlert.success("Rejected", "Project has been rejected.");
       if (onRefresh) await onRefresh();
     } catch (err: any) {
-      alert(err?.message || "Reject failed");
+      await showAlert.error("Rejection Failed", err?.message || "Reject failed");
     } finally {
       setActionLoading(false);
     }
@@ -95,12 +105,20 @@ export function ProjectDetailContent({
 
   async function handlePublish() {
     if (!project?.uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Publish Project?",
+      `Publish "${project.name}" live on the platform?`,
+      "Yes, Publish",
+      "#059669",
+    );
+    if (!confirmed) return;
     setActionLoading(true);
     try {
       await publishProject(project.uuid);
+      await showAlert.success("Published!", "Project is now live.");
       if (onRefresh) await onRefresh();
     } catch (err: any) {
-      alert(err?.message || "Publish failed");
+      await showAlert.error("Publish Failed", err?.message || "Publish failed");
     } finally {
       setActionLoading(false);
     }
@@ -108,38 +126,62 @@ export function ProjectDetailContent({
 
   async function handleUnpublish() {
     if (!project?.uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Unpublish Project?",
+      `Unpublish "${project.name}" from public view?`,
+      "Yes, Unpublish",
+      "#d97706",
+    );
+    if (!confirmed) return;
     setActionLoading(true);
     try {
       await unpublishProject(project.uuid);
+      await showAlert.success("Unpublished", "Project has been unpublished.");
       if (onRefresh) await onRefresh();
     } catch (err: any) {
-      alert(err?.message || "Unpublish failed");
+      await showAlert.error("Unpublish Failed", err?.message || "Unpublish failed");
     } finally {
       setActionLoading(false);
     }
   }
 
   async function handleDelete() {
-    if (!project?.uuid || !window.confirm("Move this project to trash?")) return;
+    if (!project?.uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Move to Trash?",
+      `Are you sure you want to move "${project.name}" to trash?`,
+      "Yes, Move to Trash",
+      "#e11d48",
+    );
+    if (!confirmed) return;
     setActionLoading(true);
     try {
       await softDeleteProject(project.uuid);
+      await showAlert.success("Moved to Trash", "Project moved to trash.");
       if (onRefresh) await onRefresh();
       else onBack();
     } catch (err: any) {
-      alert(err?.message || "Delete failed");
+      await showAlert.error("Delete Failed", err?.message || "Delete failed");
       setActionLoading(false);
     }
   }
 
   async function handleRestore() {
-    if (!project?.uuid || !window.confirm("Restore this project from trash?")) return;
+    if (!project?.uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Restore Project?",
+      `Restore "${project.name}" from trash?`,
+      "Yes, Restore",
+      "#059669",
+    );
+    if (!confirmed) return;
     setActionLoading(true);
     try {
       await restoreProject(project.uuid);
+      await showAlert.success("Restored", "Project has been restored.");
       if (onRefresh) await onRefresh();
     } catch (err: any) {
-      alert(err?.message || "Restore failed");
+      await showAlert.error("Restore Failed", err?.message || "Restore failed");
     } finally {
       setActionLoading(false);
     }

@@ -26,6 +26,7 @@ import {
   DEFAULT_IMAGE_CHANGED_EVENT,
 } from "@/lib/project-defaults";
 import { useLang } from "@/lib/i18n";
+import { showAlert } from "@/lib/swal";
 
 export function AdminProjectImageSettings() {
   const { t } = useLang();
@@ -148,20 +149,23 @@ export function AdminProjectImageSettings() {
     );
   };
 
-  const handleResetToSystem = () => {
-    if (
-      !window.confirm(
-        t({
-          bn: "আপনি কি ডিফল্ট ছবি সেটিংস রিসেট করে প্ল্যাটফর্মের মূল ছবিতে ফিরে যেতে চান?",
-          en: "Are you sure you want to reset default project image settings?",
-        }),
-      )
-    ) {
-      return;
-    }
+  const handleResetToSystem = async () => {
+    const confirmed = await showAlert.confirm(
+      t({
+        bn: "ডিফল্ট ছবি রিসেট করবেন?",
+        en: "Reset Default Images?",
+      }),
+      t({
+        bn: "শুধুমাত্র যেসব প্রজেক্টে ডায়নামিক ছবি নেই সেগুলোতে ডিফল্ট ছবি রিসেট হবে। ডায়নামিক ছবিযুক্ত প্রজেক্ট অপরিবর্তিত থাকবে।",
+        en: "Only projects without dynamic images will use the reset default image. Projects with custom dynamic images will remain unchanged.",
+      }),
+      t({ bn: "হ্যাঁ, রিসেট করুন", en: "Yes, Reset" }),
+      "#d97706",
+    );
+    if (!confirmed) return;
     resetAdminDefaultImages();
     loadSettings();
-    toast.success(
+    await showAlert.success(
       t({
         bn: "ডিফল্ট ছবি সেটিংস রিসেট করা হয়েছে",
         en: "Default project image settings reset to original",

@@ -17,6 +17,7 @@ import {
   Filter,
   FolderClosed,
   FolderPlus,
+  Heart,
   Landmark,
   LayoutDashboard,
   Loader2,
@@ -57,6 +58,8 @@ import {
   createShareUser,
   deleteCategory,
   deleteShareUser,
+  getAdminProjectFavorites,
+  getAdminProjectViews,
   getCategories,
   getInvestments,
   getProject,
@@ -68,6 +71,7 @@ import {
   restoreInvestment,
   restoreProject,
   restoreShareUser,
+  setProjectOwnerLeadPermit,
   softDeleteInvestment,
   softDeleteProject,
   unblockShareUser,
@@ -89,8 +93,9 @@ import { Navbar } from "@/components/site/Navbar";
 import { LogoMark } from "@/components/site/Logo";
 import { ProjectDetailContent } from "@/components/admin/ProjectDetailContent";
 import { AdminProjectImageSettings } from "@/components/admin/AdminProjectImageSettings";
+import { showAlert } from "@/lib/swal";
 
-type SidebarMenuKey = "dashboard" | "projects" | "investments" | "users" | "categories" | "settings";
+type SidebarMenuKey = "dashboard" | "projects" | "investments" | "analytics" | "users" | "categories" | "settings";
 
 type ProjectFilterStatus =
   | "all"
@@ -213,6 +218,11 @@ export default function ShareProjectAdminDashboardPage() {
   const [trashInvestments, setTrashInvestments] = useState<InvestmentRecord[]>([]);
   const [users, setUsers] = useState<ShareUserRecord[]>([]);
   const [categories, setCategories] = useState<ProjectCategoryRecord[]>([]);
+  const [viewLogs, setViewLogs] = useState<any[]>([]);
+  const [favoriteLogs, setFavoriteLogs] = useState<any[]>([]);
+  const [analyticsTab, setAnalyticsTab] = useState<"views" | "favorites">("views");
+  const [analyticsPage, setAnalyticsPage] = useState(1);
+  const [selectedViewLog, setSelectedViewLog] = useState<any | null>(null);
 
   // Search & Filtering
   const [searchQuery, setSearchQuery] = useState("");
@@ -289,7 +299,7 @@ export default function ShareProjectAdminDashboardPage() {
       setSelectedProjectData(proj);
       setSelectedProjectInvestments(invs);
     } catch (err: any) {
-      alert(err?.message || "Failed to load project details");
+      await showAlert.error("Load Failed", err?.message || "Failed to load project details");
       setSelectedProjectUuid(null);
     } finally {
       setSelectedProjectLoading(false);
@@ -354,6 +364,14 @@ export default function ShareProjectAdminDashboardPage() {
       .then((trashInvList) => setTrashInvestments(trashInvList))
       .catch(() => {});
 
+    const loadViewsPromise = getAdminProjectViews()
+      .then((list) => setViewLogs(Array.isArray(list) ? list : []))
+      .catch(() => {});
+
+    const loadFavoritesPromise = getAdminProjectFavorites()
+      .then((list) => setFavoriteLogs(Array.isArray(list) ? list : []))
+      .catch(() => {});
+
     try {
       await Promise.allSettled([loadProjectsPromise, loadInvestmentsPromise]);
     } catch {
@@ -365,6 +383,8 @@ export default function ShareProjectAdminDashboardPage() {
         loadUsersPromise,
         loadCategoriesPromise,
         loadTrashInvestmentsPromise,
+        loadViewsPromise,
+        loadFavoritesPromise,
       ]);
     }
   }
@@ -381,13 +401,21 @@ export default function ShareProjectAdminDashboardPage() {
 
   // Project Actions
   async function handleApproveProject(uuid?: string) {
-    if (!uuid || !window.confirm("Approve this share project?")) return;
+    if (!uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Approve Share Project?",
+      "Approve this project so the seller can submit a publish request?",
+      "Yes, Approve",
+      "#059669",
+    );
+    if (!confirmed) return;
     setActionLoadingUuid(uuid);
     try {
       await approveProject(uuid);
+      await showAlert.success("Approved!", "Project approved successfully.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Approval failed");
+      await showAlert.error("Approval Failed", e?.message || "Approval failed");
     } finally {
       setActionLoadingUuid(null);
     }
@@ -401,9 +429,10 @@ export default function ShareProjectAdminDashboardPage() {
       await rejectProject(rejectingProject.uuid, rejectReason.trim());
       setRejectingProject(null);
       setRejectReason("");
+      await showAlert.success("Rejected", "Project rejected successfully.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Rejection failed");
+      await showAlert.error("Rejection Failed", e?.message || "Rejection failed");
     } finally {
       setActionLoadingUuid(null);
     }
@@ -411,12 +440,20 @@ export default function ShareProjectAdminDashboardPage() {
 
   async function handlePublishProject(uuid?: string) {
     if (!uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Publish Project?",
+      "Publish this project live for all buyers?",
+      "Yes, Publish",
+      "#059669",
+    );
+    if (!confirmed) return;
     setActionLoadingUuid(uuid);
     try {
       await publishProject(uuid);
+      await showAlert.success("Published!", "Project is now live.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Publish failed");
+      await showAlert.error("Publish Failed", e?.message || "Publish failed");
     } finally {
       setActionLoadingUuid(null);
     }
@@ -424,38 +461,62 @@ export default function ShareProjectAdminDashboardPage() {
 
   async function handleUnpublishProject(uuid?: string) {
     if (!uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Unpublish Project?",
+      "Unpublish this project from public listing?",
+      "Yes, Unpublish",
+      "#d97706",
+    );
+    if (!confirmed) return;
     setActionLoadingUuid(uuid);
     try {
       await unpublishProject(uuid);
+      await showAlert.success("Unpublished", "Project unpublished successfully.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Unpublish failed");
+      await showAlert.error("Unpublish Failed", e?.message || "Unpublish failed");
     } finally {
       setActionLoadingUuid(null);
     }
   }
 
   async function handleDeleteProject(uuid?: string) {
-    if (!uuid || !window.confirm("Move this project to trash?")) return;
+    if (!uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Move to Trash?",
+      "Are you sure you want to move this project to trash?",
+      "Yes, Move to Trash",
+      "#e11d48",
+    );
+    if (!confirmed) return;
     setActionLoadingUuid(uuid);
     try {
       await softDeleteProject(uuid);
+      await showAlert.success("Moved to Trash", "Project moved to trash.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Delete failed");
+      await showAlert.error("Delete Failed", e?.message || "Delete failed");
     } finally {
       setActionLoadingUuid(null);
     }
   }
 
   async function handleRestoreProject(uuid?: string) {
-    if (!uuid || !window.confirm("Restore this project from trash?")) return;
+    if (!uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Restore Project?",
+      "Restore this project from trash?",
+      "Yes, Restore",
+      "#059669",
+    );
+    if (!confirmed) return;
     setActionLoadingUuid(uuid);
     try {
       await restoreProject(uuid);
+      await showAlert.success("Restored", "Project restored successfully.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Restore failed");
+      await showAlert.error("Restore Failed", e?.message || "Restore failed");
     } finally {
       setActionLoadingUuid(null);
     }
@@ -463,13 +524,21 @@ export default function ShareProjectAdminDashboardPage() {
 
   // Investment Actions
   async function handleApproveInvestment(uuid?: string) {
-    if (!uuid || !window.confirm("Confirm and approve this investment?")) return;
+    if (!uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Approve Investment?",
+      "Confirm and approve this buyer investment request?",
+      "Yes, Approve",
+      "#059669",
+    );
+    if (!confirmed) return;
     setActionLoadingUuid(uuid);
     try {
       await approveInvestment(uuid);
+      await showAlert.success("Approved!", "Investment approved and confirmed.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Investment approval failed");
+      await showAlert.error("Approval Failed", e?.message || "Investment approval failed");
     } finally {
       setActionLoadingUuid(null);
     }
@@ -483,35 +552,52 @@ export default function ShareProjectAdminDashboardPage() {
       await rejectInvestment(rejectingInvestment.uuid, investmentRejectReason.trim());
       setRejectingInvestment(null);
       setInvestmentRejectReason("");
+      await showAlert.success("Rejected", "Investment request rejected.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Investment rejection failed");
+      await showAlert.error("Rejection Failed", e?.message || "Investment rejection failed");
     } finally {
       setActionLoadingUuid(null);
     }
   }
 
   async function handleDeleteInvestment(uuid?: string) {
-    if (!uuid || !window.confirm("Move this investment to trash?")) return;
+    if (!uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Move Investment to Trash?",
+      "Are you sure you want to move this investment to trash?",
+      "Yes, Move to Trash",
+      "#e11d48",
+    );
+    if (!confirmed) return;
     setActionLoadingUuid(uuid);
     try {
       await softDeleteInvestment(uuid);
+      await showAlert.success("Moved to Trash", "Investment moved to trash.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Failed to delete investment");
+      await showAlert.error("Delete Failed", e?.message || "Failed to delete investment");
     } finally {
       setActionLoadingUuid(null);
     }
   }
 
   async function handleRestoreInvestment(uuid?: string) {
-    if (!uuid || !window.confirm("Restore this investment?")) return;
+    if (!uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Restore Investment?",
+      "Restore this investment from trash?",
+      "Yes, Restore",
+      "#059669",
+    );
+    if (!confirmed) return;
     setActionLoadingUuid(uuid);
     try {
       await restoreInvestment(uuid);
+      await showAlert.success("Restored", "Investment restored successfully.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Failed to restore investment");
+      await showAlert.error("Restore Failed", e?.message || "Failed to restore investment");
     } finally {
       setActionLoadingUuid(null);
     }
@@ -521,10 +607,15 @@ export default function ShareProjectAdminDashboardPage() {
   async function handleToggleBlockUser(user: ShareUserRecord) {
     if (!user.uuid) return;
     const isBlocked = user.status?.toLowerCase() === "blocked";
-    const prompt = isBlocked
-      ? `Unblock user "${user.name || user.email}"?`
-      : `Block user "${user.name || user.email}"?`;
-    if (!window.confirm(prompt)) return;
+    const confirmed = await showAlert.confirm(
+      isBlocked ? "Unblock User?" : "Block User?",
+      isBlocked
+        ? `Unblock user "${user.name || user.email}"?`
+        : `Block user "${user.name || user.email}"?`,
+      isBlocked ? "Yes, Unblock" : "Yes, Block",
+      isBlocked ? "#059669" : "#e11d48",
+    );
+    if (!confirmed) return;
     setActionLoadingUuid(user.uuid);
     try {
       if (isBlocked) {
@@ -532,14 +623,16 @@ export default function ShareProjectAdminDashboardPage() {
         setUsers((prev) =>
           prev.map((u) => (u.uuid === user.uuid ? { ...u, status: "active" } : u))
         );
+        await showAlert.success("Unblocked", "User has been unblocked.");
       } else {
         await blockShareUser(user.uuid);
         setUsers((prev) =>
           prev.map((u) => (u.uuid === user.uuid ? { ...u, status: "blocked" } : u))
         );
+        await showAlert.success("Blocked", "User has been blocked.");
       }
     } catch (e: any) {
-      alert(e?.message || "Action failed");
+      await showAlert.error("Action Failed", e?.message || "Action failed");
     } finally {
       setActionLoadingUuid(null);
     }
@@ -547,20 +640,22 @@ export default function ShareProjectAdminDashboardPage() {
 
   async function handleDeleteUser(user: ShareUserRecord) {
     if (!user.uuid) return;
-    if (
-      !window.confirm(
-        `Are you sure you want to delete "${user.name || user.email}"? (This will be a soft delete)`
-      )
-    ) {
+    const confirmed = await showAlert.confirm(
+      "Delete User?",
+      `Are you sure you want to delete "${user.name || user.email}"? (Soft delete)`,
+      "Yes, Delete",
+      "#e11d48",
+    );
+    if (!confirmed) {
       return;
     }
     setActionLoadingUuid(user.uuid);
     try {
       await deleteShareUser(user.uuid);
-      // Fast optimistic update
       setUsers((prev) => prev.filter((u) => u.uuid !== user.uuid));
+      await showAlert.success("Deleted", "User deleted successfully.");
     } catch (e: any) {
-      alert(e?.message || "Delete user failed");
+      await showAlert.error("Delete Failed", e?.message || "Delete user failed");
     } finally {
       setActionLoadingUuid(null);
     }
@@ -621,9 +716,45 @@ export default function ShareProjectAdminDashboardPage() {
   }
 
   // Category Actions
+  async function handleToggleOwnerLeadPermit(projectUuid: string, currentPermit: boolean) {
+    const nextPermit = !currentPermit;
+    const confirmed = await showAlert.confirm(
+      nextPermit ? "Grant Owner Lead Permit?" : "Revoke Owner Lead Permit?",
+      nextPermit
+        ? "Allow this project's Seller to view Buyer View Logs & Favorites under Interested Leads?"
+        : "Hide Buyer View Logs & Favorites from this project's Seller?",
+      nextPermit ? "Yes, Permit Owner" : "Yes, Revoke",
+      nextPermit ? "#059669" : "#d97706",
+    );
+    if (!confirmed) return;
+    try {
+      await setProjectOwnerLeadPermit(projectUuid, nextPermit);
+      setViewLogs((prev) =>
+        prev.map((v) => (v.projectUuid === projectUuid ? { ...v, allowOwnerLeadView: nextPermit } : v)),
+      );
+      setFavoriteLogs((prev) =>
+        prev.map((f) => (f.projectUuid === projectUuid ? { ...f, allowOwnerLeadView: nextPermit } : f)),
+      );
+      setProjects((prev) =>
+        prev.map((p) => (p.uuid === projectUuid ? { ...p, allowOwnerLeadView: nextPermit } : p)),
+      );
+      await showAlert.success(
+        nextPermit ? "Permitted!" : "Revoked",
+        nextPermit
+          ? "Seller can now see Interested Leads for this project."
+          : "Owner lead permission has been revoked.",
+      );
+    } catch (e: any) {
+      await showAlert.error("Failed", e?.message || "Could not update owner permit");
+    }
+  }
+
   async function handleSaveCategory(e: React.FormEvent) {
     e.preventDefault();
-    if (!categoryForm.name.trim()) return alert("Category name is required");
+    if (!categoryForm.name.trim()) {
+      await showAlert.warning("Required", "Category name is required");
+      return;
+    }
     try {
       if (categoryModal.item?.uuid) {
         await updateCategory(categoryModal.item.uuid, {
@@ -631,26 +762,38 @@ export default function ShareProjectAdminDashboardPage() {
           code: categoryForm.code.trim() || undefined,
         });
       } else {
-        if (!categoryForm.code.trim()) return alert("Category code is required");
+        if (!categoryForm.code.trim()) {
+          await showAlert.warning("Required", "Category code is required");
+          return;
+        }
         await createCategory({
           name: categoryForm.name.trim(),
           code: categoryForm.code.trim(),
         });
       }
       setCategoryModal({ open: false, item: null });
+      await showAlert.success("Saved!", "Category saved successfully.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Save category failed");
+      await showAlert.error("Save Failed", e?.message || "Save category failed");
     }
   }
 
   async function handleDeleteCategory(category: ProjectCategoryRecord) {
-    if (!category.uuid || !window.confirm(`Delete category "${category.name}"?`)) return;
+    if (!category.uuid) return;
+    const confirmed = await showAlert.confirm(
+      "Delete Category?",
+      `Delete category "${category.name}"?`,
+      "Yes, Delete",
+      "#e11d48",
+    );
+    if (!confirmed) return;
     try {
       await deleteCategory(category.uuid);
+      await showAlert.success("Deleted", "Category deleted successfully.");
       await loadAllData();
     } catch (e: any) {
-      alert(e?.message || "Delete category failed");
+      await showAlert.error("Delete Failed", e?.message || "Delete category failed");
     }
   }
 
@@ -792,6 +935,7 @@ export default function ShareProjectAdminDashboardPage() {
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { key: "projects", label: "All Project", icon: Building2, count: projects.length },
     { key: "investments", label: "Investments", icon: Landmark, count: investments.length },
+    { key: "analytics", label: "Views & Favorites", icon: Heart, count: viewLogs.length },
     { key: "users", label: "Share User", icon: Users, count: users.length },
     { key: "categories", label: "Category", icon: FolderClosed, count: categories.length },
     { key: "settings", label: "Settings", icon: Settings },
@@ -1433,11 +1577,11 @@ export default function ShareProjectAdminDashboardPage() {
                     </div>
                   </div>
 
-                  {/* Projects Table */}
+                  {/* Projects Table (Sticky Header & Pagination, Scrollable Body) */}
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                    <div className="overflow-x-auto">
+                    <div className="max-h-[460px] overflow-x-auto overflow-y-auto">
                       <table className="w-full text-left text-xs">
-                        <thead className="border-b border-slate-100 bg-slate-50/75 text-slate-500 uppercase tracking-wider font-semibold">
+                        <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold shadow-2xs">
                           <tr>
                             <th className="px-4 py-3.5">Project</th>
                             <th className="px-4 py-3.5">Category</th>
@@ -1648,9 +1792,9 @@ export default function ShareProjectAdminDashboardPage() {
                   </div>
 
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                    <div className="overflow-x-auto">
+                    <div className="max-h-[460px] overflow-x-auto overflow-y-auto">
                       <table className="w-full text-left text-xs">
-                        <thead className="border-b border-slate-100 bg-slate-50/75 text-slate-500 uppercase tracking-wider font-semibold">
+                        <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold shadow-2xs">
                           <tr>
                             <th className="px-4 py-3.5">Buyer</th>
                             <th className="px-4 py-3.5">Project</th>
@@ -1819,9 +1963,9 @@ export default function ShareProjectAdminDashboardPage() {
                   </div>
 
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                    <div className="overflow-x-auto">
+                    <div className="max-h-[460px] overflow-x-auto overflow-y-auto">
                       <table className="w-full text-left text-xs">
-                        <thead className="border-b border-slate-100 bg-slate-50/75 text-slate-500 uppercase tracking-wider font-semibold">
+                        <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold shadow-2xs">
                           <tr>
                             <th className="px-4 py-3.5">User</th>
                             <th className="px-4 py-3.5">Phone</th>
@@ -1954,9 +2098,9 @@ export default function ShareProjectAdminDashboardPage() {
                   </div>
 
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                    <div className="overflow-x-auto">
+                    <div className="max-h-[460px] overflow-x-auto overflow-y-auto">
                       <table className="w-full text-left text-xs">
-                        <thead className="border-b border-slate-100 bg-slate-50/75 text-slate-500 uppercase tracking-wider font-semibold">
+                        <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold shadow-2xs">
                           <tr>
                             <th className="px-4 py-3.5">Category Name</th>
                             <th className="px-4 py-3.5">Code</th>
@@ -2017,6 +2161,227 @@ export default function ShareProjectAdminDashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* VIEW: ANALYTICS (BUYER VIEWS & FAVORITES) */}
+              {activeMenu === "analytics" && (() => {
+                const q = searchQuery.trim().toLowerCase();
+                const filteredViews = viewLogs.filter((v) => {
+                  if (!q) return true;
+                  return `${v.viewerName || ""} ${v.viewerEmail || ""} ${v.viewerPhone || ""} ${v.projectName || ""} ${v.projectCode || ""}`
+                    .toLowerCase()
+                    .includes(q);
+                });
+                const filteredFavs = favoriteLogs.filter((f) => {
+                  if (!q) return true;
+                  return `${f.userName || ""} ${f.userEmail || ""} ${f.userPhone || ""} ${f.projectName || ""} ${f.projectCode || ""}`
+                    .toLowerCase()
+                    .includes(q);
+                });
+                const activeList = analyticsTab === "views" ? filteredViews : filteredFavs;
+                const paginatedAnalytics = activeList.slice((analyticsPage - 1) * 10, analyticsPage * 10);
+
+                return (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+                          Buyer Views &amp; Favorites Analytics
+                        </h1>
+                        <p className="text-xs sm:text-sm text-slate-500">
+                          Track buyer visit counts, exact visit timestamps, favorites, and manage Seller lead permissions.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => {
+                              setSearchQuery(e.target.value);
+                              setAnalyticsPage(1);
+                            }}
+                            placeholder="Search buyer, project..."
+                            className="h-9 w-48 sm:w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAnalyticsTab("views");
+                            setAnalyticsPage(1);
+                          }}
+                          className={`rounded-xl px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 ${
+                            analyticsTab === "views"
+                              ? "bg-slate-900 text-white"
+                              : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View Logs ({filteredViews.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAnalyticsTab("favorites");
+                            setAnalyticsPage(1);
+                          }}
+                          className={`rounded-xl px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 ${
+                            analyticsTab === "favorites"
+                              ? "bg-rose-600 text-white"
+                              : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Heart className="h-3.5 w-3.5" />
+                          Favorites ({filteredFavs.length})
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+                      <div className="max-h-[460px] overflow-x-auto overflow-y-auto">
+                        {analyticsTab === "views" ? (
+                          <table className="w-full text-left text-xs">
+                            <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold shadow-2xs">
+                              <tr>
+                                <th className="px-4 py-3.5">Buyer / Visitor</th>
+                                <th className="px-4 py-3.5">Project</th>
+                                <th className="px-4 py-3.5 text-center">Total Views</th>
+                                <th className="px-4 py-3.5">Favorite</th>
+                                <th className="px-4 py-3.5">Last Viewed</th>
+                                <th className="px-4 py-3.5 text-center">Permit for Owner</th>
+                                <th className="px-4 py-3.5 text-right">Details</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {paginatedAnalytics.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                                    No buyer project view logs recorded yet.
+                                  </td>
+                                </tr>
+                              ) : (
+                                paginatedAnalytics.map((v) => (
+                                  <tr key={v.key} className="hover:bg-slate-50/60 transition">
+                                    <td className="px-4 py-3.5">
+                                      <p className="font-bold text-slate-900">{v.viewerName || "Guest Buyer"}</p>
+                                      <p className="text-[11px] text-slate-500">
+                                        {v.viewerEmail || v.viewerPhone || v.visitorKey}
+                                      </p>
+                                      {v.viewerPhone && v.viewerEmail && (
+                                        <p className="text-[10px] text-slate-400">{v.viewerPhone}</p>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3.5">
+                                      <p className="font-bold text-slate-900">{v.projectName}</p>
+                                      <p className="text-[11px] text-slate-400">{v.projectCode || v.projectLocation}</p>
+                                    </td>
+                                    <td className="px-4 py-3.5 text-center">
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-extrabold text-emerald-700">
+                                        {v.viewCount}x
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3.5">
+                                      {v.isFavorited ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-600">
+                                          <Heart className="h-3 w-3 fill-rose-500" /> Favorited
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 text-[11px]">-</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3.5 text-[11px] text-slate-600">
+                                      {v.lastViewedAt ? new Date(v.lastViewedAt).toLocaleString() : "-"}
+                                    </td>
+                                    <td className="px-4 py-3.5 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleOwnerLeadPermit(v.projectUuid, Boolean(v.allowOwnerLeadView))}
+                                        className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                                          v.allowOwnerLeadView
+                                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                                        }`}
+                                      >
+                                        {v.allowOwnerLeadView ? "Permitted" : "Permit Owner"}
+                                      </button>
+                                    </td>
+                                    <td className="px-4 py-3.5 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedViewLog(v)}
+                                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                                      >
+                                        Timestamps ({v.timestamps?.length || v.viewCount})
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <table className="w-full text-left text-xs">
+                            <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold shadow-2xs">
+                              <tr>
+                                <th className="px-4 py-3.5">Buyer</th>
+                                <th className="px-4 py-3.5">Project</th>
+                                <th className="px-4 py-3.5">Favorited At</th>
+                                <th className="px-4 py-3.5 text-center">Permit for Owner</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {paginatedAnalytics.length === 0 ? (
+                                <tr>
+                                  <td colSpan={4} className="py-12 text-center text-slate-400">
+                                    No project favorites recorded yet.
+                                  </td>
+                                </tr>
+                              ) : (
+                                paginatedAnalytics.map((f) => (
+                                  <tr key={f.uuid} className="hover:bg-slate-50/60 transition">
+                                    <td className="px-4 py-3.5">
+                                      <p className="font-bold text-slate-900">{f.userName || "Buyer"}</p>
+                                      <p className="text-[11px] text-slate-500">{f.userEmail || f.userPhone || "-"}</p>
+                                    </td>
+                                    <td className="px-4 py-3.5">
+                                      <p className="font-bold text-slate-900">{f.projectName}</p>
+                                      <p className="text-[11px] text-slate-400">{f.projectCode || f.projectLocation}</p>
+                                    </td>
+                                    <td className="px-4 py-3.5 text-[11px] text-slate-600">
+                                      {f.favoritedAt ? new Date(f.favoritedAt).toLocaleString() : "-"}
+                                    </td>
+                                    <td className="px-4 py-3.5 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleOwnerLeadPermit(f.projectUuid, Boolean(f.allowOwnerLeadView))}
+                                        className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                                          f.allowOwnerLeadView
+                                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                                        }`}
+                                      >
+                                        {f.allowOwnerLeadView ? "Permitted" : "Permit Owner"}
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                      <Pagination
+                        currentPage={analyticsPage}
+                        totalItems={activeList.length}
+                        pageSize={10}
+                        onPageChange={setAnalyticsPage}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* VIEW: SETTINGS */}
               {activeMenu === "settings" && <AdminProjectImageSettings />}
@@ -2547,6 +2912,52 @@ export default function ShareProjectAdminDashboardPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* VIEW TIMESTAMPS DETAIL MODAL */}
+      {selectedViewLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Visit Timestamps — {selectedViewLog.viewerName || "Guest Buyer"}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {selectedViewLog.projectName} • Total {selectedViewLog.viewCount} views
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedViewLog(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 max-h-72 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-100 bg-slate-50/50">
+              {(selectedViewLog.timestamps || []).map((tItem: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between px-3.5 py-2.5 text-xs">
+                  <span className="font-semibold text-slate-700">
+                    Visit #{(selectedViewLog.timestamps?.length || 0) - idx}
+                  </span>
+                  <span className="font-mono text-slate-600">
+                    {tItem.viewedAt ? new Date(tItem.viewedAt).toLocaleString() : "-"}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedViewLog(null)}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
