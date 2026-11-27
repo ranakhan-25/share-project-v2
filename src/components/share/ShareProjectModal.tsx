@@ -24,9 +24,11 @@ export function ShareProjectModal({ open, onClose, project }: ShareProjectModalP
   const projectName = project?.name || "Share Project";
 
   useEffect(() => {
-    if (typeof window !== "undefined" && projectUuid) {
-      const origin = window.location.origin;
-      setShareUrl(`${origin}/projects/${projectUuid}`);
+    if (projectUuid) {
+      const siteOrigin = (
+        process.env.NEXT_PUBLIC_SITE_URL || "https://share.realbizerp.online"
+      ).replace(/\/+$/, "");
+      setShareUrl(`${siteOrigin}/projects/${projectUuid}`);
     }
   }, [projectUuid]);
 

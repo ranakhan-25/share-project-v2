@@ -462,3 +462,26 @@ export async function restoreInvestment(uuid: string) {
     method: "PATCH",
   });
 }
+
+/* ==================== VIEW LOGS, FAVORITES & OWNER PERMIT ==================== */
+
+export async function getAdminProjectViews(projectUuid?: string) {
+  const res = await request("/share-project/admin/analytics/views", {
+    params: projectUuid ? { projectUuid } : undefined,
+  });
+  return unwrap<any>(res);
+}
+
+export async function getAdminProjectFavorites(projectUuid?: string) {
+  const res = await request("/share-project/admin/analytics/favorites", {
+    params: projectUuid ? { projectUuid } : undefined,
+  });
+  return unwrap<any>(res);
+}
+
+export async function setProjectOwnerLeadPermit(uuid: string, allowOwnerLeadView: boolean) {
+  return request(`/share-project/admin/projects/${encodeURIComponent(uuid)}/owner-lead-permit`, {
+    method: "PATCH",
+    body: { allowOwnerLeadView },
+  });
+}
