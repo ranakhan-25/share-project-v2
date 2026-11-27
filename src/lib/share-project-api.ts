@@ -530,4 +530,20 @@ export async function getOwnerProjectInterestedLeads(projectUuid: string) {
   }>(res.data);
 }
 
+export async function updateOwnerProjectThumbnailApi(projectUuid: string, thumbnailUrl: string) {
+  const res = await api.patch(`${ROOT}/user/projects/${encodeURIComponent(projectUuid)}/thumbnail`, {
+    thumbnailUrl,
+  });
+  clearClientProjectCache();
+  return unwrap<{ uuid: string; thumbnailUrl: string }>(res.data);
+}
+
+export async function applyOwnerDefaultImageToEmptyApi(defaultImageUrl: string) {
+  const res = await api.post(`${ROOT}/user/projects/apply-default-image`, {
+    defaultImageUrl,
+  });
+  clearClientProjectCache();
+  return unwrap<{ updatedCount: number }>(res.data);
+}
+
 

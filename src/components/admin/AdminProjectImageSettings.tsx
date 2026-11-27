@@ -34,6 +34,12 @@ import {
   updateAdminProjectThumbnail,
   type ShareProjectRecord,
 } from "@/lib/admin-share-project-api";
+import {
+  applyOwnerDefaultImageToEmptyApi,
+  getOwnerProjects,
+  updateOwnerProjectThumbnailApi,
+} from "@/lib/share-project-api";
+import { getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
 import { useLang } from "@/lib/i18n";
 import { showAlert } from "@/lib/swal";
 
@@ -51,9 +57,21 @@ export function AdminProjectImageSettings() {
   const [applyingDefaults, setApplyingDefaults] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
 
+  const isAdminUser = () => {
+    const u = getStoredUser() as any;
+    const role = String(u?.role || "").toLowerCase();
+    return role === "super_admin" || role === "admin" || role === "super-admin";
+  };
+
   const loadProjectsForImages = async () => {
     try {
-      const list = await getProjects({ limit: 100 });
+      let list: ShareProjectRecord[] = [];
+      if (isAdminUser()) {
+        list = await getProjects({ limit: 100 });
+      } else {
+        const res = await getOwnerProjects(undefined, 1, 100);
+        list = Array.isArray(res?.data) ? (res.data as unknown as ShareProjectRecord[]) : [];
+      }
       setProjectsList(list);
       const map: Record<string, string> = {};
       for (const p of list) {
@@ -80,7 +98,9 @@ export function AdminProjectImageSettings() {
     if (!confirmed) return;
     setApplyingDefaults(true);
     try {
-      const res: any = await applyDefaultImageToEmptyProjects(previewUrl || BASE_GLOBAL_DEFAULT_IMAGE);
+      const res: any = isAdminUser()
+        ? await applyDefaultImageToEmptyProjects(previewUrl || BASE_GLOBAL_DEFAULT_IMAGE)
+        : await applyOwnerDefaultImageToEmptyApi(previewUrl || BASE_GLOBAL_DEFAULT_IMAGE);
       const count = Number(res?.data?.updatedCount ?? res?.updatedCount ?? 0);
       await showAlert.success(
         t({ bn: "সম্পন্ন!", en: "Applied!" }),
@@ -100,7 +120,11 @@ export function AdminProjectImageSettings() {
   async function handleSaveSingleProjectImage(uuid: string, nextUrl: string) {
     setSavingProjectUuid(uuid);
     try {
-      await updateAdminProjectThumbnail(uuid, nextUrl);
+      if (isAdminUser()) {
+        await updateAdminProjectThumbnail(uuid, nextUrl);
+      } else {
+        await updateOwnerProjectThumbnailApi(uuid, nextUrl);
+      }
       await showAlert.success(
         t({ bn: "ছবি আপডেট হয়েছে", en: "Image Updated!" }),
         t({ bn: "প্রজেক্টের ছবি সফলভাবে সেভ করা হয়েছে।", en: "Project image saved successfully." }),
