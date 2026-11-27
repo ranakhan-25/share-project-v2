@@ -45,12 +45,18 @@ export async function generateMetadata({
     returnRate > 0 ? ` • Expected Return: ${returnRate}%` : ""
   }. Invest securely on Share Project.`;
 
+  const siteUrl = (
+    process.env.NEXT_PUBLIC_SITE_URL || "https://share.realbizerp.online"
+  ).replace(/\/+$/, "");
+
   return {
+    metadataBase: new URL(siteUrl),
     title,
     description,
     openGraph: {
       title,
       description,
+      url: `${siteUrl}/projects/${id}`,
       type: "website",
       siteName: "Share Project",
     },
