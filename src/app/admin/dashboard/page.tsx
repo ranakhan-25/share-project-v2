@@ -1120,18 +1120,19 @@ export default function ShareProjectAdminDashboardPage() {
 
               {/* VIEW: DASHBOARD OVERVIEW */}
               {activeMenu === "dashboard" && (
-                <div className="space-y-6">
-                  <div>
-                    <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-                      {t({ bn: "এডমিন ওভারভিউ", en: "Admin Dashboard" })}
-                    </h1>
-                    <p className="mt-1 text-xs sm:text-sm text-slate-500">
-                      {t({
-                        bn: "শেয়ার প্রজেক্টের রিয়েল-টাইম মেট্রিক্স, অনুমোদন পেন্ডিং ও অ্যাক্টিভিটি।",
-                        en: "Real-time metrics, project pipeline, and shareholder governance.",
-                      })}
-                    </p>
-                  </div>
+                <div className="flex h-[calc(100vh-8.5rem)] flex-col gap-5">
+                  <div className="shrink-0 space-y-4">
+                    <div>
+                      <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+                        {t({ bn: "এডমিন ওভারভিউ", en: "Admin Dashboard" })}
+                      </h1>
+                      <p className="mt-1 text-xs sm:text-sm text-slate-500">
+                        {t({
+                          bn: "শেয়ার প্রজেক্টের রিয়েল-টাইম মেট্রিক্স, অনুমোদন পেন্ডিং ও অ্যাক্টিভিটি।",
+                          en: "Real-time metrics, project pipeline, and shareholder governance.",
+                        })}
+                      </p>
+                    </div>
 
                   {/* Stat Cards */}
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1200,7 +1201,10 @@ export default function ShareProjectAdminDashboardPage() {
                       <p className="mt-1 text-[11px] text-slate-400">Total applications</p>
                     </button>
                   </div>
+                  </div>
 
+                  {/* ==================== SCROLLABLE ANALYTICS & TABLES ==================== */}
+                  <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pr-1 pb-4">
                   {/* ==================== RECHARTS ANALYTICS SECTION ==================== */}
                   <div className="grid gap-6 lg:grid-cols-3">
                     {/* Left: Investment Capital Trends (Area Chart) */}
@@ -1473,6 +1477,7 @@ export default function ShareProjectAdminDashboardPage() {
                         onPageChange={setDashboardInvestmentPage}
                       />
                     </div>
+                  </div>
                   </div>
                 </div>
               )}
