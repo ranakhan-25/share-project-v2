@@ -205,6 +205,7 @@ export default function ShareProjectAdminDashboardPage() {
   const [projectPage, setProjectPage] = useState(1);
   const [investmentPage, setInvestmentPage] = useState(1);
   const [userPage, setUserPage] = useState(1);
+  const [userSearch, setUserSearch] = useState("");
   const [categoryPage, setCategoryPage] = useState(1);
   const [dashboardInvestmentPage, setDashboardInvestmentPage] = useState(1);
 
@@ -894,10 +895,23 @@ export default function ShareProjectAdminDashboardPage() {
     return currentInvestmentsList.slice(start, start + 10);
   }, [currentInvestmentsList, investmentPage]);
 
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(
+      (u) =>
+        (u.name || "").toLowerCase().includes(q) ||
+        (u.email || "").toLowerCase().includes(q) ||
+        (u.phone || u.mobileNo || "").toLowerCase().includes(q) ||
+        (u.role || "").toLowerCase().includes(q) ||
+        (u.status || "").toLowerCase().includes(q)
+    );
+  }, [users, userSearch]);
+
   const paginatedUsers = useMemo(() => {
     const start = (userPage - 1) * 10;
-    return users.slice(start, start + 10);
-  }, [users, userPage]);
+    return filteredUsers.slice(start, start + 10);
+  }, [filteredUsers, userPage]);
 
   const paginatedCategories = useMemo(() => {
     const start = (categoryPage - 1) * 10;
@@ -2016,6 +2030,25 @@ export default function ShareProjectAdminDashboardPage() {
                     </div>
                   </div>
 
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-xs">
+                    <div className="relative w-full max-w-md">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={userSearch}
+                        onChange={(e) => {
+                          setUserSearch(e.target.value);
+                          setUserPage(1);
+                        }}
+                        placeholder="Search by name, email, phone, role or status..."
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+                      />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {filteredUsers.length} {filteredUsers.length === 1 ? "user" : "users"} found
+                    </span>
+                  </div>
+
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
                     <div className="max-h-[460px] overflow-x-auto overflow-y-auto">
                       <table className="w-full text-left text-xs">
@@ -2031,10 +2064,12 @@ export default function ShareProjectAdminDashboardPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-slate-700">
-                          {users.length === 0 ? (
+                          {filteredUsers.length === 0 ? (
                             <tr>
                               <td colSpan={7} className="py-12 text-center text-slate-400">
-                                No users registered on the platform.
+                                {userSearch.trim()
+                                  ? "No users match your search."
+                                  : "No users registered on the platform."}
                               </td>
                             </tr>
                           ) : (
@@ -2131,7 +2166,7 @@ export default function ShareProjectAdminDashboardPage() {
                     </div>
                     <Pagination
                       currentPage={userPage}
-                      totalItems={users.length}
+                      totalItems={filteredUsers.length}
                       pageSize={10}
                       onPageChange={setUserPage}
                     />
