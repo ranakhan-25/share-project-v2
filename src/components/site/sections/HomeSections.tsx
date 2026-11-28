@@ -154,7 +154,8 @@ export function FeaturedProjects() {
         "";
 
       if (typeof image === "string") {
-        return image.trim();
+        const trimmed = image.trim();
+        return trimmed.startsWith("/") ? `${API_BASE}${trimmed}` : trimmed;
       }
 
       if (image && typeof image === "object") {

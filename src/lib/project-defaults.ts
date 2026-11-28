@@ -117,14 +117,14 @@ export function getProjectDefaultImage(category?: string, index: number = 0): st
     if (cat.includes(key.toLowerCase()) && url) return url;
   }
 
-  // 2. Check admin global default image
-  const globalCustom = getAdminCustomDefaultImage();
-  if (globalCustom) return globalCustom;
-
-  // 3. Check built-in category mapping
+  // 2. Check built-in category mapping so distinct categories keep distinct images
   for (const [key, url] of Object.entries(CATEGORY_DEFAULT_IMAGES)) {
     if (cat.includes(key)) return url;
   }
+
+  // 3. Check admin global default image (for uncategorized / fallback projects)
+  const globalCustom = getAdminCustomDefaultImage();
+  if (globalCustom) return globalCustom;
 
   // 4. Default fallback rotation
   return FALLBACK_PROJECT_IMAGES[index % FALLBACK_PROJECT_IMAGES.length] || BASE_GLOBAL_DEFAULT_IMAGE;
@@ -172,4 +172,34 @@ export function resetAdminDefaultImages(): void {
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * Compresses an uploaded image file to a lightweight JPEG data URL (< ~80KB)
+ * so project thumbnails load fast and never bloat database payloads.
+ */
+export function compressImageFileToDataUrl(file: File, maxWidth = 960, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error("Invalid image file"));
+      img.onload = () => {
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(String(reader.result || ""));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  });
 }

@@ -54,6 +54,7 @@ export default function ProjectsPage() {
     return !projectsPageCache.has(1);
   });
   const [sharingProject, setSharingProject] = useState<{ id: string; name: string; location?: string } | null>(null);
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
   const pageSize = 9;
 
   useEffect(() => {
@@ -515,22 +516,30 @@ export default function ProjectsPage() {
                 )}
               </div>
             ) : null}
-            {filtered.map((project) => {
+            {filtered.map((project, idx) => {
                 const percent = Math.round(
                   (project.soldShares / project.totalShares) * 100,
                 );
+                const resolvedImage = failedImages[project.id]
+                  ? getProjectDefaultImage(project.category.en, idx)
+                  : project.image;
                 return (
                   <article
                     key={project.id}
                     className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                   >
-                    <div className="relative h-52">
+                    <div className="relative h-52 bg-slate-100">
                       <Image
-                        src={project.image}
+                        src={resolvedImage}
                         alt={t(project.name)}
                         fill
                         sizes="(max-width:768px) 100vw, (max-width:1024px) 50vw, 33vw"
                         className="object-cover"
+                        onError={() =>
+                          setFailedImages((prev) =>
+                            prev[project.id] ? prev : { ...prev, [project.id]: true },
+                          )
+                        }
                       />
                       <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-emerald-700">
                         {t(project.category)}

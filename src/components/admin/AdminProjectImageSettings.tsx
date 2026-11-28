@@ -13,6 +13,7 @@ import {
   Layers,
   Building2,
   CheckCircle2,
+  Search,
 } from "lucide-react";
 import {
   BASE_GLOBAL_DEFAULT_IMAGE,
@@ -24,7 +25,21 @@ import {
   setAdminCategoryDefaultImages,
   resetAdminDefaultImages,
   DEFAULT_IMAGE_CHANGED_EVENT,
+  compressImageFileToDataUrl,
+  getProjectDefaultImage,
 } from "@/lib/project-defaults";
+import {
+  applyDefaultImageToEmptyProjects,
+  getProjects,
+  updateAdminProjectThumbnail,
+  type ShareProjectRecord,
+} from "@/lib/admin-share-project-api";
+import {
+  applyOwnerDefaultImageToEmptyApi,
+  getOwnerProjects,
+  updateOwnerProjectThumbnailApi,
+} from "@/lib/share-project-api";
+import { getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
 import { useLang } from "@/lib/i18n";
 import { showAlert } from "@/lib/swal";
 
@@ -36,6 +51,91 @@ export function AdminProjectImageSettings() {
   const [inputUrl, setInputUrl] = useState<string>("");
   const [previewUrl, setPreviewUrl] = useState<string>(BASE_GLOBAL_DEFAULT_IMAGE);
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
+  const [projectsList, setProjectsList] = useState<ShareProjectRecord[]>([]);
+  const [projectThumbInputs, setProjectThumbInputs] = useState<Record<string, string>>({});
+  const [savingProjectUuid, setSavingProjectUuid] = useState<string | null>(null);
+  const [applyingDefaults, setApplyingDefaults] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+
+  const isAdminUser = () => {
+    const u = getStoredUser() as any;
+    const role = String(u?.role || "").toLowerCase();
+    return role === "super_admin" || role === "admin" || role === "super-admin";
+  };
+
+  const loadProjectsForImages = async () => {
+    try {
+      let list: ShareProjectRecord[] = [];
+      if (isAdminUser()) {
+        list = await getProjects({ limit: 100 });
+      } else {
+        const res = await getOwnerProjects(undefined, 1, 100);
+        list = Array.isArray(res?.data) ? (res.data as unknown as ShareProjectRecord[]) : [];
+      }
+      setProjectsList(list);
+      const map: Record<string, string> = {};
+      for (const p of list) {
+        if (p.uuid) map[p.uuid] = String(p.thumbnailUrl || "");
+      }
+      setProjectThumbInputs(map);
+    } catch {}
+  };
+
+  useEffect(() => {
+    void loadProjectsForImages();
+  }, []);
+
+  async function handleApplyDefaultToEmptyProjects() {
+    const confirmed = await showAlert.confirm(
+      t({ bn: "ছবিবিহীন প্রজেক্টে ডিফল্ট ছবি সেট করবেন?", en: "Apply Default Image to Image-less Projects?" }),
+      t({
+        bn: "যেসব প্রজেক্টে আগে থেকেই ছবি দেওয়া আছে সেগুলো পরিবর্তন হবে না। শুধুমাত্র ছবি ছাড়া প্রজেক্টগুলোতে ডিফল্ট ছবি সেট হবে।",
+        en: "Projects that already have a dynamic image will NOT be modified. Only projects with no image will receive this default image.",
+      }),
+      t({ bn: "হ্যাঁ, অ্যাপ্লাই করুন", en: "Yes, Apply" }),
+      "#059669",
+    );
+    if (!confirmed) return;
+    setApplyingDefaults(true);
+    try {
+      const res: any = isAdminUser()
+        ? await applyDefaultImageToEmptyProjects(previewUrl || BASE_GLOBAL_DEFAULT_IMAGE)
+        : await applyOwnerDefaultImageToEmptyApi(previewUrl || BASE_GLOBAL_DEFAULT_IMAGE);
+      const count = Number(res?.data?.updatedCount ?? res?.updatedCount ?? 0);
+      await showAlert.success(
+        t({ bn: "সম্পন্ন!", en: "Applied!" }),
+        t({
+          bn: `${count}টি ছবিবিহীন প্রজেক্টে ডিফল্ট ছবি সেট করা হয়েছে।`,
+          en: `Default image applied to ${count} projects that had no image.`,
+        }),
+      );
+      await loadProjectsForImages();
+    } catch (err: any) {
+      await showAlert.error("Error", err?.message || "Failed to apply default image");
+    } finally {
+      setApplyingDefaults(false);
+    }
+  }
+
+  async function handleSaveSingleProjectImage(uuid: string, nextUrl: string) {
+    setSavingProjectUuid(uuid);
+    try {
+      if (isAdminUser()) {
+        await updateAdminProjectThumbnail(uuid, nextUrl);
+      } else {
+        await updateOwnerProjectThumbnailApi(uuid, nextUrl);
+      }
+      await showAlert.success(
+        t({ bn: "ছবি আপডেট হয়েছে", en: "Image Updated!" }),
+        t({ bn: "প্রজেক্টের ছবি সফলভাবে সেভ করা হয়েছে।", en: "Project image saved successfully." }),
+      );
+      await loadProjectsForImages();
+    } catch (err: any) {
+      await showAlert.error("Error", err?.message || "Failed to update project image");
+    } finally {
+      setSavingProjectUuid(null);
+    }
+  }
   const [activeTab, setActiveTab] = useState<"preset" | "url" | "upload" | "categories">("preset");
   const [isSavedCustom, setIsSavedCustom] = useState(false);
 
@@ -559,6 +659,170 @@ export function AdminProjectImageSettings() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Apply Default Image to Empty Projects + Individual Project Image Manager */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">
+              {t({
+                bn: "প্রতিটি প্রজেক্টের আলাদা ছবি ম্যানেজমেন্ট",
+                en: "Per-Project Image Management",
+              })}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {t({
+                bn: "যেকোনো প্রজেক্টের জন্য আলাদা ছবি আপলোড/আপডেট করুন। নিচের বাটনে ক্লিক করলে শুধু ছবিবিহীন প্রজেক্টে ডিফল্ট ছবি বসবে—আগের ছবি পরিবর্তন হবে না।",
+                en: "Update individual project images below. Applying default image only fills projects without an image.",
+              })}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            disabled={applyingDefaults}
+            onClick={handleApplyDefaultToEmptyProjects}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-600 transition disabled:opacity-50 shrink-0"
+          >
+            <Sparkles className="h-4 w-4" />
+            {applyingDefaults
+              ? t({ bn: "অ্যাপ্লাই হচ্ছে...", en: "Applying..." })
+              : t({
+                  bn: "ছবিবিহীন প্রজেক্টে ডিফল্ট ছবি সেট করুন",
+                  en: "Apply Default to Empty Projects",
+                })}
+          </button>
+        </div>
+
+        {/* Search Input for Per-Project Images */}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={projectSearch}
+            onChange={(e) => setProjectSearch(e.target.value)}
+            placeholder={t({
+              bn: "প্রজেক্টের নাম, কোড, লোকেশন বা ক্যাটাগরি দিয়ে খুঁজুন...",
+              en: "Search project by name, code, location or category...",
+            })}
+            className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-xs text-slate-800 outline-none transition focus:border-emerald-500 focus:bg-white"
+          />
+        </div>
+
+        <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-100">
+          {(() => {
+            const q = projectSearch.trim().toLowerCase();
+            const filtered = projectsList.filter((proj) => {
+              if (!q) return true;
+              return `${proj.name || ""} ${proj.code || ""} ${proj.location || ""} ${proj.category?.name || ""}`
+                .toLowerCase()
+                .includes(q);
+            });
+            if (filtered.length === 0) {
+              return (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  {t({ bn: "কোনো প্রজেক্ট পাওয়া যায়নি", en: "No projects found" })}
+                </div>
+              );
+            }
+            return filtered.map((proj) => {
+              const uuid = String(proj.uuid || "");
+              const hasCustomImage = Boolean(String(proj.thumbnailUrl || "").trim());
+              const currentInput = projectThumbInputs[uuid] ?? String(proj.thumbnailUrl || "");
+              const apiBase = (
+                typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_BASE_URL
+                  ? process.env.NEXT_PUBLIC_API_BASE_URL
+                  : "http://localhost:5002"
+              ).replace(/\/+$/, "");
+              const displaySrc = hasCustomImage
+                ? String(proj.thumbnailUrl).startsWith("/")
+                  ? `${apiBase}${proj.thumbnailUrl}`
+                  : String(proj.thumbnailUrl)
+                : getProjectDefaultImage(proj.category?.name);
+
+              return (
+                <div
+                  key={uuid}
+                  className="flex flex-col md:flex-row md:items-center gap-4 p-3.5 hover:bg-slate-50/70 transition"
+                >
+                  <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={displaySrc}
+                      alt={String(proj.name || "Project")}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = getProjectDefaultImage(proj.category?.name);
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        {proj.name}
+                      </p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          hasCustomImage
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {hasCustomImage
+                          ? t({ bn: "ডায়নামিক ছবি আছে", en: "Has Image" })
+                          : t({ bn: "ছবি নেই (ডিফল্ট)", en: "No Image (Default)" })}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {proj.category?.name || "General"} • {proj.location || "-"}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 md:w-[420px]">
+                    <input
+                      type="url"
+                      value={currentInput}
+                      onChange={(e) =>
+                        setProjectThumbInputs((prev) => ({
+                          ...prev,
+                          [uuid]: e.target.value,
+                        }))
+                      }
+                      placeholder="https://... or upload"
+                      className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-emerald-500"
+                    />
+                    <label className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer shrink-0">
+                      <Upload className="h-3 w-3 text-emerald-600" />
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const compressed = await compressImageFileToDataUrl(file);
+                            setProjectThumbInputs((prev) => ({ ...prev, [uuid]: compressed }));
+                            await handleSaveSingleProjectImage(uuid, compressed);
+                          } catch {}
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={savingProjectUuid === uuid}
+                      onClick={() => handleSaveSingleProjectImage(uuid, currentInput)}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50 shrink-0"
+                    >
+                      {savingProjectUuid === uuid ? "..." : "Save"}
+                    </button>
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
       </div>
     </div>

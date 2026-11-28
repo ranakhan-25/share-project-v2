@@ -17,6 +17,7 @@ const isPathActive = (pathname: string, href?: string) => {
     "/dashboard/accounts",
     "/dashboard/crm",
     "/dashboard/project",
+    "/dashboard/owner",
   ];
   if (exactOnlyRoutes.includes(href)) {
     return pathname === href;

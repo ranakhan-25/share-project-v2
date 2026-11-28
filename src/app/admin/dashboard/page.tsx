@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { setShareUserLeadAccess } from "@/lib/share-project-api";
 import {
   AlertCircle,
   Building2,
@@ -204,6 +205,7 @@ export default function ShareProjectAdminDashboardPage() {
   const [projectPage, setProjectPage] = useState(1);
   const [investmentPage, setInvestmentPage] = useState(1);
   const [userPage, setUserPage] = useState(1);
+  const [userSearch, setUserSearch] = useState("");
   const [categoryPage, setCategoryPage] = useState(1);
   const [dashboardInvestmentPage, setDashboardInvestmentPage] = useState(1);
 
@@ -638,6 +640,38 @@ export default function ShareProjectAdminDashboardPage() {
     }
   }
 
+  async function handleToggleUserLeadAccess(user: ShareUserRecord) {
+    if (!user.uuid) return;
+    const currentAccess = Boolean((user as any).allowLeadView);
+    const nextAccess = !currentAccess;
+    const confirmed = await showAlert.confirm(
+      nextAccess ? "Grant All-Projects Lead Access?" : "Revoke All-Projects Lead Access?",
+      nextAccess
+        ? `Allow "${user.name || user.email}" to view buyer Views, Favorites, Compares & Investments across ALL of their projects?`
+        : `Revoke seller-wide lead access from "${user.name || user.email}"?`,
+      nextAccess ? "Yes, Grant Access" : "Yes, Revoke",
+      nextAccess ? "#059669" : "#d97706",
+    );
+    if (!confirmed) return;
+    setActionLoadingUuid(user.uuid);
+    try {
+      await setShareUserLeadAccess(user.uuid, nextAccess);
+      setUsers((prev) =>
+        prev.map((u) => (u.uuid === user.uuid ? { ...u, allowLeadView: nextAccess } : u))
+      );
+      await showAlert.success(
+        nextAccess ? "Access Granted!" : "Access Revoked",
+        nextAccess
+          ? "Seller can now see buyer activity across all of their projects."
+          : "Seller-wide lead access has been revoked."
+      );
+    } catch (e: any) {
+      await showAlert.error("Action Failed", e?.message || "Could not update lead access");
+    } finally {
+      setActionLoadingUuid(null);
+    }
+  }
+
   async function handleDeleteUser(user: ShareUserRecord) {
     if (!user.uuid) return;
     const confirmed = await showAlert.confirm(
@@ -861,10 +895,23 @@ export default function ShareProjectAdminDashboardPage() {
     return currentInvestmentsList.slice(start, start + 10);
   }, [currentInvestmentsList, investmentPage]);
 
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(
+      (u) =>
+        (u.name || "").toLowerCase().includes(q) ||
+        (u.email || "").toLowerCase().includes(q) ||
+        (u.phone || u.mobileNo || "").toLowerCase().includes(q) ||
+        (u.role || "").toLowerCase().includes(q) ||
+        (u.status || "").toLowerCase().includes(q)
+    );
+  }, [users, userSearch]);
+
   const paginatedUsers = useMemo(() => {
     const start = (userPage - 1) * 10;
-    return users.slice(start, start + 10);
-  }, [users, userPage]);
+    return filteredUsers.slice(start, start + 10);
+  }, [filteredUsers, userPage]);
 
   const paginatedCategories = useMemo(() => {
     const start = (categoryPage - 1) * 10;
@@ -960,7 +1007,7 @@ export default function ShareProjectAdminDashboardPage() {
 
       {/* Top spacing because Navbar is fixed */}
       <div className="pt-20">
-        <div className="mx-auto flex max-w-7xl min-h-[calc(100vh-5rem)] px-5 sm:px-8">
+        <div className="mx-auto flex max-w-7xl min-h-[calc(100vh-5rem)] lg:h-[calc(100vh-5rem)] lg:overflow-hidden px-5 sm:px-8">
           {/* Mobile Sidebar Overlay */}
           {isMobileSidebarOpen && (
             <div
@@ -971,7 +1018,7 @@ export default function ShareProjectAdminDashboardPage() {
 
           {/* ==================== 2. LEFT SIDEBAR ==================== */}
           <aside
-            className={`fixed inset-y-0 left-0 top-20 z-40 flex w-64 shrink-0 flex-col border-r lg:border-l border-slate-200 bg-white transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+            className={`fixed inset-y-0 left-0 top-20 z-40 flex w-64 shrink-0 flex-col border-r lg:border-l border-slate-200 bg-white transition-transform duration-300 ease-in-out lg:static lg:h-full lg:overflow-y-auto lg:translate-x-0 ${
               isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
             }`}
           >
@@ -1055,9 +1102,9 @@ export default function ShareProjectAdminDashboardPage() {
           </aside>
 
           {/* ==================== 3. MAIN DASHBOARD CONTENT ==================== */}
-          <div className="flex flex-1 flex-col min-w-0 lg:border-r border-slate-200">
+          <div className="flex flex-1 flex-col min-w-0 lg:h-full lg:overflow-hidden lg:border-r border-slate-200">
             {/* Top Bar with Mobile Menu Toggle & Controls */}
-            <div className="flex h-12 items-center justify-between border-b border-slate-200 bg-white/70 px-4 sm:px-6">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200 bg-white/70 px-4 sm:px-6">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1107,7 +1154,7 @@ export default function ShareProjectAdminDashboardPage() {
             </div>
 
             {/* Content Area */}
-            <main className="flex-1 p-4 sm:p-6 lg:p-8">
+            <main className="flex-1 lg:overflow-y-auto p-4 sm:p-6 lg:p-8">
               {error && (
                 <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1593,20 +1640,21 @@ export default function ShareProjectAdminDashboardPage() {
                             <th className="px-4 py-3.5">Location</th>
                             <th className="px-4 py-3.5">Financials</th>
                             <th className="px-4 py-3.5">Status</th>
+                            <th className="px-4 py-3.5 text-center">Lead Permit</th>
                             <th className="px-4 py-3.5 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-slate-700">
                           {loading ? (
                             <tr>
-                              <td colSpan={6} className="py-12 text-center text-slate-400">
+                              <td colSpan={7} className="py-12 text-center text-slate-400">
                                 <Loader2 className="mx-auto h-6 w-6 animate-spin text-emerald-500" />
                                 <p className="mt-2">Loading projects...</p>
                               </td>
                             </tr>
                           ) : filteredProjects.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="py-12 text-center text-slate-400">
+                              <td colSpan={7} className="py-12 text-center text-slate-400">
                                 No projects match the selected filter ({projectStatusFilter}).
                               </td>
                             </tr>
@@ -1669,6 +1717,21 @@ export default function ShareProjectAdminDashboardPage() {
                                       >
                                         Reason: {String(p.rejectionReason)}
                                       </p>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3.5 text-center">
+                                    {p.uuid && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleOwnerLeadPermit(String(p.uuid), Boolean(p.allowOwnerLeadView))}
+                                        className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                                          p.allowOwnerLeadView
+                                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                                        }`}
+                                      >
+                                        {p.allowOwnerLeadView ? "Permitted" : "Permit Owner"}
+                                      </button>
                                     )}
                                   </td>
                                   <td className="px-4 py-3.5 text-right">
@@ -1967,6 +2030,25 @@ export default function ShareProjectAdminDashboardPage() {
                     </div>
                   </div>
 
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-xs">
+                    <div className="relative w-full max-w-md">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={userSearch}
+                        onChange={(e) => {
+                          setUserSearch(e.target.value);
+                          setUserPage(1);
+                        }}
+                        placeholder="Search by name, email, phone, role or status..."
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+                      />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {filteredUsers.length} {filteredUsers.length === 1 ? "user" : "users"} found
+                    </span>
+                  </div>
+
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
                     <div className="max-h-[460px] overflow-x-auto overflow-y-auto">
                       <table className="w-full text-left text-xs">
@@ -1976,15 +2058,18 @@ export default function ShareProjectAdminDashboardPage() {
                             <th className="px-4 py-3.5">Phone</th>
                             <th className="px-4 py-3.5">Role</th>
                             <th className="px-4 py-3.5">Status</th>
+                            <th className="px-4 py-3.5">Lead Access</th>
                             <th className="px-4 py-3.5">Registered</th>
                             <th className="px-4 py-3.5 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-slate-700">
-                          {users.length === 0 ? (
+                          {filteredUsers.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="py-12 text-center text-slate-400">
-                                No users registered on the platform.
+                              <td colSpan={7} className="py-12 text-center text-slate-400">
+                                {userSearch.trim()
+                                  ? "No users match your search."
+                                  : "No users registered on the platform."}
                               </td>
                             </tr>
                           ) : (
@@ -2014,6 +2099,21 @@ export default function ShareProjectAdminDashboardPage() {
                                     >
                                       {u.status || "Active"}
                                     </span>
+                                  </td>
+                                  <td className="px-4 py-3.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleUserLeadAccess(u)}
+                                      disabled={actionLoadingUuid === u.uuid}
+                                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-50 ${
+                                        (u as any).allowLeadView
+                                          ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                          : "bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
+                                      }`}
+                                      title="Grant/Revoke access to Views, Favorites, Compares & Investments across all of this seller's projects"
+                                    >
+                                      {(u as any).allowLeadView ? "All Leads ON" : "Permit All Leads"}
+                                    </button>
                                   </td>
                                   <td className="px-4 py-3.5 text-slate-400 text-[11px]">
                                     {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-"}
@@ -2066,7 +2166,7 @@ export default function ShareProjectAdminDashboardPage() {
                     </div>
                     <Pagination
                       currentPage={userPage}
-                      totalItems={users.length}
+                      totalItems={filteredUsers.length}
                       pageSize={10}
                       onPageChange={setUserPage}
                     />

@@ -485,3 +485,17 @@ export async function setProjectOwnerLeadPermit(uuid: string, allowOwnerLeadView
     body: { allowOwnerLeadView },
   });
 }
+
+export async function updateAdminProjectThumbnail(uuid: string, thumbnailUrl: string) {
+  return request(`/share-project/admin/projects/${encodeURIComponent(uuid)}/thumbnail`, {
+    method: "PATCH",
+    body: { thumbnailUrl },
+  });
+}
+
+export async function applyDefaultImageToEmptyProjects(defaultImageUrl: string, categoryId?: number) {
+  return request(`/share-project/admin/projects/apply-default-image`, {
+    method: "POST",
+    body: { defaultImageUrl, ...(categoryId ? { categoryId } : {}) },
+  });
+}

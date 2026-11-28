@@ -34,7 +34,12 @@ import {
   unpublishProject,
   type InvestmentRecord,
   type ShareProjectRecord,
+  updateAdminProjectThumbnail,
 } from "@/lib/admin-share-project-api";
+import {
+  compressImageFileToDataUrl,
+  getProjectDefaultImage,
+} from "@/lib/project-defaults";
 import { showAlert } from "@/lib/swal";
 
 function formatDate(value?: string | null) {
@@ -62,6 +67,46 @@ export function ProjectDetailContent({
   const [rejecting, setRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [customImageInput, setCustomImageInput] = useState(String(project.thumbnailUrl || ""));
+  const [savingImage, setSavingImage] = useState(false);
+
+  const apiBase = (
+    typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_BASE_URL
+      ? process.env.NEXT_PUBLIC_API_BASE_URL
+      : "http://localhost:5002"
+  ).replace(/\/+$/, "");
+
+  const resolvedThumb = (() => {
+    const raw = String(project.thumbnailUrl || "").trim();
+    if (!raw) return getProjectDefaultImage(project.category?.name);
+    return raw.startsWith("/") ? `${apiBase}${raw}` : raw;
+  })();
+
+  async function handleSaveCustomImage(nextUrl: string) {
+    if (!project?.uuid) return;
+    setSavingImage(true);
+    try {
+      await updateAdminProjectThumbnail(project.uuid, nextUrl);
+      await showAlert.success("Image Updated!", "Project thumbnail image has been updated.");
+      if (onRefresh) await onRefresh();
+    } catch (err: any) {
+      await showAlert.error("Update Failed", err?.message || "Failed to update project image");
+    } finally {
+      setSavingImage(false);
+    }
+  }
+
+  async function handleImageFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageFileToDataUrl(file);
+      setCustomImageInput(compressed);
+      await handleSaveCustomImage(compressed);
+    } catch (err: any) {
+      await showAlert.error("Upload Failed", err?.message || "Invalid image file");
+    }
+  }
 
   const status = String(project.status || "draft").toLowerCase();
 
@@ -328,6 +373,62 @@ export function ProjectDetailContent({
             <p className="mt-1 text-sm text-rose-900">{String(project.rejectionReason)}</p>
           </div>
         )}
+      </div>
+
+      {/* Individual Project Thumbnail Image Manager */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center gap-5">
+          <div className="relative h-32 w-full md:w-52 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={resolvedThumb}
+              alt={String(project.name || "Project Thumbnail")}
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = getProjectDefaultImage(project.category?.name);
+              }}
+            />
+          </div>
+          <div className="flex-1 space-y-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <ImageIcon className="h-4 w-4 text-emerald-600" />
+                Project Thumbnail Image (Admin Override)
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Set or update a custom image specifically for this project. Other projects remain unaffected.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="url"
+                value={customImageInput}
+                onChange={(e) => setCustomImageInput(e.target.value)}
+                placeholder="Paste image URL (https://...) or upload a file"
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+              />
+              <label className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer shrink-0">
+                <ImageIcon className="h-3.5 w-3.5 text-emerald-600" />
+                Upload File
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileUpload}
+                  className="hidden"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={savingImage}
+                onClick={() => handleSaveCustomImage(customImageInput)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 shrink-0"
+              >
+                {savingImage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                Save Image
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Financial Highlights */}
