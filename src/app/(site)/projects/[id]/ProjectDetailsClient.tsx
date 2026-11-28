@@ -35,6 +35,7 @@ import {
   toggleProjectFavoriteApi,
 } from "@/lib/share-project-api";
 import { getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import { showAlert } from "@/lib/swal";
 
 interface ProjectDoc {
   title: string;
@@ -99,6 +100,7 @@ export default function ProjectDetailsClient() {
 
   const [favorited, setFavorited] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const available = project
     ? Math.max(0, project.totalShares - project.soldShares)
     : 0;
@@ -160,9 +162,26 @@ export default function ProjectDetailsClient() {
       })
       .catch(() => setProject(null));
 
-    // Record buyer/visitor view log with timestamp
+    // Record buyer/visitor view log with timestamp & pre-fill logged-in user
     try {
       const storedUser = getStoredUser() as any;
+      if (storedUser) {
+        setLoggedInUser(storedUser);
+        const userEmail = String(storedUser.email || "").trim();
+        const userName = String(storedUser.name || "").trim();
+        const userPhone = String(storedUser.phone || storedUser.mobileNo || "").trim();
+        if (userEmail || userName || userPhone) {
+          setIndividualForm((prev) => ({
+            name: prev.name || userName,
+            email: userEmail || prev.email,
+            phone: prev.phone || userPhone,
+          }));
+          setOrgForm((prev) => ({
+            ...prev,
+            email: userEmail || prev.email,
+          }));
+        }
+      }
       let visitorKey = "";
       if (typeof window !== "undefined") {
         visitorKey = localStorage.getItem("share-project:visitor-key") || "";
@@ -228,6 +247,18 @@ export default function ProjectDetailsClient() {
   const handleSubmitInvestment = async (event: React.FormEvent) => {
     event.preventDefault();
     setInvestmentError("");
+
+    const currentUser = getStoredUser();
+    if (!currentUser) {
+      await showAlert.warning(
+        t({ bn: "লগইন প্রয়োজন", en: "Login First" }),
+        t({
+          bn: "ইনভেস্ট করার জন্য অনুগ্রহ করে আগে লগইন করুন।",
+          en: "Please log in first before submitting an investment request.",
+        }),
+      );
+      return;
+    }
 
     let payload: any = {
       projectUuid: params.id,
@@ -594,6 +625,105 @@ export default function ProjectDetailsClient() {
                   </span>
                 </div>
               </div>
+
+              {/* Project Documents (Login Required) */}
+              <div className="mt-10 border-t border-slate-100 pt-8">
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-emerald-600" />
+                      {t({
+                        bn: "প্রজেক্ট ডকুমেন্টস",
+                        en: "Project Documents",
+                      })}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {t({
+                        bn: "প্রজেক্ট সম্পর্কিত অনুমোদিত কাগজপত্র ও ডকুমেন্টস",
+                        en: "Verified project documents and downloadable files.",
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {!loggedInUser ? (
+                  <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/70 p-6 text-center">
+                    <Lock className="mx-auto h-8 w-8 text-amber-500" />
+                    <h4 className="mt-2.5 text-sm font-bold text-slate-900">
+                      {t({
+                        bn: "ডকুমেন্ট দেখতে ও ডাউনলোড করতে লগইন করুন",
+                        en: "Login First to View & Download Documents",
+                      })}
+                    </h4>
+                    <p className="mx-auto mt-1 max-w-md text-xs text-slate-600">
+                      {t({
+                        bn: "লগইন ছাড়া আপনি শুধুমাত্র প্রজেক্টটি দেখতে পারবেন। প্রজেক্টের ডকুমেন্ট দেখতে ও ডাউনলোড করতে অনুগ্রহ করে লগইন করুন।",
+                        en: "Guests can view project details only. Please log in as a Buyer or Seller to view and download project documents.",
+                      })}
+                    </p>
+                    <Link
+                      href="/login"
+                      className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-800"
+                    >
+                      <LogIn className="h-3.5 w-3.5" />
+                      {t({ bn: "লগইন করুন", en: "Log In" })}
+                    </Link>
+                  </div>
+                ) : project.documents.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">
+                    {t({
+                      bn: "এই প্রজেক্টের জন্য কোনো ডকুমেন্ট আপলোড করা হয়নি।",
+                      en: "No documents have been uploaded for this project yet.",
+                    })}
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {project.documents.map((doc, idx) => (
+                      <div
+                        key={`${doc.url}-${idx}`}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 transition hover:border-emerald-200 hover:bg-emerald-50/20"
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-bold text-slate-900">
+                              {doc.title}
+                            </p>
+                            <p className="text-[11px] uppercase text-slate-400">
+                              {doc.fileType || "Document"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <a
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+                            title="View Document"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            View
+                          </a>
+                          <a
+                            href={doc.url}
+                            download={doc.title || "document"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                            title="Download Document"
+                          >
+                            <Download className="h-3 w-3" />
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Right Aside: Investment Form */}
@@ -697,6 +827,7 @@ export default function ProjectDetailsClient() {
                 </div>
               ) : (
                 <form
+                  noValidate
                   className="mt-6 space-y-4"
                   onSubmit={handleSubmitInvestment}
                 >
@@ -791,6 +922,7 @@ export default function ProjectDetailsClient() {
                         <input
                           required
                           type="email"
+                          readOnly={Boolean(loggedInUser?.email)}
                           placeholder="investor@example.com"
                           value={individualForm.email}
                           onChange={(e) =>
@@ -799,7 +931,9 @@ export default function ProjectDetailsClient() {
                               email: e.target.value,
                             })
                           }
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                          className={`w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 ${
+                            loggedInUser?.email ? "bg-slate-100 cursor-not-allowed" : "bg-white"
+                          }`}
                         />
                       </div>
                     </>
@@ -868,6 +1002,7 @@ export default function ProjectDetailsClient() {
                         <input
                           required
                           type="email"
+                          readOnly={Boolean(loggedInUser?.email)}
                           placeholder="info@company.com"
                           value={orgForm.email}
                           onChange={(e) =>
