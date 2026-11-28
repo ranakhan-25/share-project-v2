@@ -184,6 +184,8 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
   }>({ hasSellerWideAccess: false, permittedProjectCount: 0, totalProjectCount: 0, leads: [] });
   const [allLeadsLoading, setAllLeadsLoading] = useState(false);
   const [leadSearch, setLeadSearch] = useState("");
+  const [leadPage, setLeadPage] = useState(1);
+  const [leadsPageSize, setLeadsPageSize] = useState(5);
   const [selectedBuyerLead, setSelectedBuyerLead] = useState<BuyerInterestedLead | null>(null);
 
   const reloadProjects = async () => {
@@ -988,7 +990,10 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                 <input
                   type="text"
                   value={leadSearch}
-                  onChange={(e) => setLeadSearch(e.target.value)}
+                  onChange={(e) => {
+                    setLeadSearch(e.target.value);
+                    setLeadPage(1);
+                  }}
                   placeholder="Search by buyer name, email, phone or project..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
                 />
@@ -1033,7 +1038,14 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredLeads.map((lead) => (
+                    {filteredLeads
+                      .slice(
+                        (Math.min(leadPage, Math.max(1, Math.ceil(filteredLeads.length / leadsPageSize))) - 1) *
+                          leadsPageSize,
+                        Math.min(leadPage, Math.max(1, Math.ceil(filteredLeads.length / leadsPageSize))) *
+                          leadsPageSize
+                      )
+                      .map((lead) => (
                       <tr key={lead.buyerKey} className="hover:bg-slate-50/80">
                         <td className="py-3.5 pr-4">
                           <div className="font-semibold text-slate-900">{lead.buyerName}</div>
@@ -1112,6 +1124,87 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                     ))}
                   </tbody>
                 </table>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-xs text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <span>
+                      Showing{" "}
+                      <span className="font-semibold text-slate-900">
+                        {(Math.min(leadPage, Math.max(1, Math.ceil(filteredLeads.length / leadsPageSize))) - 1) *
+                          leadsPageSize +
+                          1}
+                      </span>
+                      –
+                      <span className="font-semibold text-slate-900">
+                        {Math.min(
+                          Math.min(leadPage, Math.max(1, Math.ceil(filteredLeads.length / leadsPageSize))) *
+                            leadsPageSize,
+                          filteredLeads.length
+                        )}
+                      </span>{" "}
+                      of <span className="font-semibold text-slate-900">{filteredLeads.length}</span> buyers
+                    </span>
+                    <select
+                      value={leadsPageSize}
+                      onChange={(e) => {
+                        setLeadsPageSize(Number(e.target.value));
+                        setLeadPage(1);
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:border-emerald-500"
+                    >
+                      {[5, 10, 20, 50].map((size) => (
+                        <option key={size} value={size}>
+                          {size} / page
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={leadPage <= 1}
+                      onClick={() => setLeadPage((p) => Math.max(1, p - 1))}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Prev
+                    </button>
+                    {Array.from(
+                      { length: Math.max(1, Math.ceil(filteredLeads.length / leadsPageSize)) },
+                      (_, i) => i + 1
+                    ).map((pageNum) => {
+                      const active =
+                        pageNum ===
+                        Math.min(leadPage, Math.max(1, Math.ceil(filteredLeads.length / leadsPageSize)));
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => setLeadPage(pageNum)}
+                          className={`min-w-[32px] rounded-lg px-2.5 py-1.5 font-semibold transition ${
+                            active
+                              ? "bg-emerald-600 text-white shadow-xs"
+                              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      disabled={leadPage >= Math.max(1, Math.ceil(filteredLeads.length / leadsPageSize))}
+                      onClick={() =>
+                        setLeadPage((p) =>
+                          Math.min(Math.max(1, Math.ceil(filteredLeads.length / leadsPageSize)), p + 1)
+                        )
+                      }
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
