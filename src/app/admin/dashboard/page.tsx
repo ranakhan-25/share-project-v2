@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { setShareUserLeadAccess } from "@/lib/share-project-api";
 import {
   AlertCircle,
   Building2,
@@ -633,6 +634,38 @@ export default function ShareProjectAdminDashboardPage() {
       }
     } catch (e: any) {
       await showAlert.error("Action Failed", e?.message || "Action failed");
+    } finally {
+      setActionLoadingUuid(null);
+    }
+  }
+
+  async function handleToggleUserLeadAccess(user: ShareUserRecord) {
+    if (!user.uuid) return;
+    const currentAccess = Boolean((user as any).allowLeadView);
+    const nextAccess = !currentAccess;
+    const confirmed = await showAlert.confirm(
+      nextAccess ? "Grant All-Projects Lead Access?" : "Revoke All-Projects Lead Access?",
+      nextAccess
+        ? `Allow "${user.name || user.email}" to view buyer Views, Favorites, Compares & Investments across ALL of their projects?`
+        : `Revoke seller-wide lead access from "${user.name || user.email}"?`,
+      nextAccess ? "Yes, Grant Access" : "Yes, Revoke",
+      nextAccess ? "#059669" : "#d97706",
+    );
+    if (!confirmed) return;
+    setActionLoadingUuid(user.uuid);
+    try {
+      await setShareUserLeadAccess(user.uuid, nextAccess);
+      setUsers((prev) =>
+        prev.map((u) => (u.uuid === user.uuid ? { ...u, allowLeadView: nextAccess } : u))
+      );
+      await showAlert.success(
+        nextAccess ? "Access Granted!" : "Access Revoked",
+        nextAccess
+          ? "Seller can now see buyer activity across all of their projects."
+          : "Seller-wide lead access has been revoked."
+      );
+    } catch (e: any) {
+      await showAlert.error("Action Failed", e?.message || "Could not update lead access");
     } finally {
       setActionLoadingUuid(null);
     }
@@ -1992,6 +2025,7 @@ export default function ShareProjectAdminDashboardPage() {
                             <th className="px-4 py-3.5">Phone</th>
                             <th className="px-4 py-3.5">Role</th>
                             <th className="px-4 py-3.5">Status</th>
+                            <th className="px-4 py-3.5">Lead Access</th>
                             <th className="px-4 py-3.5">Registered</th>
                             <th className="px-4 py-3.5 text-right">Actions</th>
                           </tr>
@@ -1999,7 +2033,7 @@ export default function ShareProjectAdminDashboardPage() {
                         <tbody className="divide-y divide-slate-100 text-slate-700">
                           {users.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="py-12 text-center text-slate-400">
+                              <td colSpan={7} className="py-12 text-center text-slate-400">
                                 No users registered on the platform.
                               </td>
                             </tr>
@@ -2030,6 +2064,21 @@ export default function ShareProjectAdminDashboardPage() {
                                     >
                                       {u.status || "Active"}
                                     </span>
+                                  </td>
+                                  <td className="px-4 py-3.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleUserLeadAccess(u)}
+                                      disabled={actionLoadingUuid === u.uuid}
+                                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-50 ${
+                                        (u as any).allowLeadView
+                                          ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                          : "bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
+                                      }`}
+                                      title="Grant/Revoke access to Views, Favorites, Compares & Investments across all of this seller's projects"
+                                    >
+                                      {(u as any).allowLeadView ? "All Leads ON" : "Permit All Leads"}
+                                    </button>
                                   </td>
                                   <td className="px-4 py-3.5 text-slate-400 text-[11px]">
                                     {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-"}

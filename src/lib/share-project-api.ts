@@ -530,6 +530,15 @@ export async function getOwnerProjectInterestedLeads(projectUuid: string) {
   }>(res.data);
 }
 
+export interface BuyerLeadProjectInvestment {
+  uuid: string;
+  code: string;
+  quantity: number;
+  totalAmount: string;
+  status: string;
+  createdAt: string;
+}
+
 export interface BuyerLeadProjectDetail {
   projectUuid: string;
   projectName: string;
@@ -538,8 +547,11 @@ export interface BuyerLeadProjectDetail {
   viewCount: number;
   isFavorited: boolean;
   favoritedAt: string | null;
+  isCompared: boolean;
+  comparedAt: string | null;
   lastViewedAt: string | null;
   timestamps: { viewedAt: string; ipAddress: string | null }[];
+  investments: BuyerLeadProjectInvestment[];
 }
 
 export interface BuyerInterestedLead {
@@ -549,6 +561,8 @@ export interface BuyerInterestedLead {
   buyerPhone: string;
   totalViews: number;
   totalFavorites: number;
+  totalCompares: number;
+  totalInvestments: number;
   totalProjectsCount: number;
   lastActivityAt: string;
   projects: BuyerLeadProjectDetail[];
@@ -557,10 +571,19 @@ export interface BuyerInterestedLead {
 export async function getOwnerAllInterestedLeads() {
   const res = await api.get(`${ROOT}/user/interested-leads`);
   return unwrap<{
+    hasSellerWideAccess?: boolean;
     permittedProjectCount: number;
     totalProjectCount: number;
     leads: BuyerInterestedLead[];
   }>(res.data);
+}
+
+export async function setShareUserLeadAccess(userUuid: string, allowLeadView: boolean) {
+  const res = await api.patch(
+    `/realbizpro/api/v1/share-user/${encodeURIComponent(userUuid)}/lead-access`,
+    { allowLeadView }
+  );
+  return unwrap<{ uuid: string; allowLeadView: boolean }>(res.data);
 }
 
 export async function updateOwnerProjectThumbnailApi(projectUuid: string, thumbnailUrl: string) {

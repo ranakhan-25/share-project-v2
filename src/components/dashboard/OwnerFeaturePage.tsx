@@ -177,10 +177,11 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [selectedLeadTimestamps, setSelectedLeadTimestamps] = useState<ProjectViewGroup | null>(null);
   const [allLeadsData, setAllLeadsData] = useState<{
+    hasSellerWideAccess?: boolean;
     permittedProjectCount: number;
     totalProjectCount: number;
     leads: BuyerInterestedLead[];
-  }>({ permittedProjectCount: 0, totalProjectCount: 0, leads: [] });
+  }>({ hasSellerWideAccess: false, permittedProjectCount: 0, totalProjectCount: 0, leads: [] });
   const [allLeadsLoading, setAllLeadsLoading] = useState(false);
   const [leadSearch, setLeadSearch] = useState("");
   const [selectedBuyerLead, setSelectedBuyerLead] = useState<BuyerInterestedLead | null>(null);
@@ -966,6 +967,11 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {allLeadsData.hasSellerWideAccess && (
+                <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                  All Projects Access Granted
+                </span>
+              )}
               <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
                 Permitted Projects: {allLeadsData.permittedProjectCount} / {allLeadsData.totalProjectCount}
               </span>
@@ -1018,8 +1024,10 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                     <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
                       <th className="py-3 pr-4">Buyer Information</th>
                       <th className="py-3 pr-4">Projects</th>
-                      <th className="py-3 pr-4">Total Views</th>
+                      <th className="py-3 pr-4">Views</th>
                       <th className="py-3 pr-4">Favorites</th>
+                      <th className="py-3 pr-4">Compares</th>
+                      <th className="py-3 pr-4">Investments</th>
                       <th className="py-3 pr-4">Last Activity</th>
                       <th className="py-3 text-right">Details</th>
                     </tr>
@@ -1039,7 +1047,7 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                             <Building2 className="h-3.5 w-3.5 text-slate-500" />
                             {lead.totalProjectsCount} {lead.totalProjectsCount === 1 ? "Project" : "Projects"}
                           </div>
-                          <div className="mt-1 max-w-[220px] truncate text-xs text-slate-500">
+                          <div className="mt-1 max-w-[200px] truncate text-xs text-slate-500">
                             {lead.projects.map((p) => p.projectName).join(", ")}
                           </div>
                         </td>
@@ -1059,6 +1067,30 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                           >
                             <Heart className="h-3.5 w-3.5" />
                             {lead.totalFavorites}
+                          </span>
+                        </td>
+                        <td className="py-3.5 pr-4">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              (lead.totalCompares || 0) > 0
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-slate-100 text-slate-500"
+                            }`}
+                          >
+                            <Layers className="h-3.5 w-3.5" />
+                            {lead.totalCompares || 0}
+                          </span>
+                        </td>
+                        <td className="py-3.5 pr-4">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              (lead.totalInvestments || 0) > 0
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-slate-100 text-slate-500"
+                            }`}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {lead.totalInvestments || 0}
                           </span>
                         </td>
                         <td className="py-3.5 pr-4 text-xs text-slate-600">
@@ -1111,23 +1143,35 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                 </button>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-3">
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <div className="text-xs text-slate-500">Projects Interacted</div>
+                  <div className="text-xs text-slate-500">Projects</div>
                   <div className="mt-1 text-lg font-bold text-slate-900">
                     {selectedBuyerLead.totalProjectsCount}
                   </div>
                 </div>
                 <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
-                  <div className="text-xs text-blue-600">Total Views</div>
+                  <div className="text-xs text-blue-600">Views</div>
                   <div className="mt-1 text-lg font-bold text-blue-700">
                     {selectedBuyerLead.totalViews} বার
                   </div>
                 </div>
                 <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3">
-                  <div className="text-xs text-rose-600">Favorited Projects</div>
+                  <div className="text-xs text-rose-600">Favorites</div>
                   <div className="mt-1 text-lg font-bold text-rose-700">
                     {selectedBuyerLead.totalFavorites}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+                  <div className="text-xs text-amber-600">Compares</div>
+                  <div className="mt-1 text-lg font-bold text-amber-700">
+                    {selectedBuyerLead.totalCompares || 0}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+                  <div className="text-xs text-emerald-600">Investments</div>
+                  <div className="mt-1 text-lg font-bold text-emerald-700">
+                    {selectedBuyerLead.totalInvestments || 0}
                   </div>
                 </div>
               </div>
@@ -1160,8 +1204,52 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                               : ""}
                           </span>
                         )}
+                        {proj.isCompared && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                            <Layers className="h-3 w-3" />
+                            Compared
+                            {proj.comparedAt
+                              ? ` (${new Date(proj.comparedAt).toLocaleString()})`
+                              : ""}
+                          </span>
+                        )}
+                        {(proj.investments?.length || 0) > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {proj.investments.length} Invested
+                          </span>
+                        )}
                       </div>
                     </div>
+
+                    {(proj.investments?.length || 0) > 0 && (
+                      <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/40 p-3">
+                        <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          ইনভেস্টমেন্টের তথ্য (Investments)
+                        </div>
+                        <div className="space-y-1.5">
+                          {proj.investments.map((inv) => (
+                            <div
+                              key={inv.uuid}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200/70 bg-white px-2.5 py-1.5 text-xs"
+                            >
+                              <span className="font-semibold text-slate-800">
+                                {inv.code || inv.uuid.slice(0, 8)} • {inv.quantity} Shares • ৳{Number(inv.totalAmount).toLocaleString()}
+                              </span>
+                              <span className="flex items-center gap-2">
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-800">
+                                  {inv.status}
+                                </span>
+                                <span className="font-mono text-slate-600">
+                                  {inv.createdAt ? new Date(inv.createdAt).toLocaleString() : "-"}
+                                </span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {proj.timestamps.length > 0 ? (
                       <div className="mt-3 rounded-lg bg-slate-50 p-3">
@@ -1184,9 +1272,13 @@ export function OwnerFeaturePage({ feature = "dashboard", status, projectId }: P
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-2 text-xs text-slate-400">
-                        Only saved in Favorite list (no view logs recorded).
-                      </p>
+                      !proj.isFavorited &&
+                      !proj.isCompared &&
+                      (!proj.investments || proj.investments.length === 0) && (
+                        <p className="mt-2 text-xs text-slate-400">
+                          No view logs recorded.
+                        </p>
+                      )
                     )}
                   </div>
                 ))}
