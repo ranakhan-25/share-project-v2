@@ -1593,20 +1593,21 @@ export default function ShareProjectAdminDashboardPage() {
                             <th className="px-4 py-3.5">Location</th>
                             <th className="px-4 py-3.5">Financials</th>
                             <th className="px-4 py-3.5">Status</th>
+                            <th className="px-4 py-3.5 text-center">Lead Permit</th>
                             <th className="px-4 py-3.5 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-slate-700">
                           {loading ? (
                             <tr>
-                              <td colSpan={6} className="py-12 text-center text-slate-400">
+                              <td colSpan={7} className="py-12 text-center text-slate-400">
                                 <Loader2 className="mx-auto h-6 w-6 animate-spin text-emerald-500" />
                                 <p className="mt-2">Loading projects...</p>
                               </td>
                             </tr>
                           ) : filteredProjects.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="py-12 text-center text-slate-400">
+                              <td colSpan={7} className="py-12 text-center text-slate-400">
                                 No projects match the selected filter ({projectStatusFilter}).
                               </td>
                             </tr>
@@ -1669,6 +1670,21 @@ export default function ShareProjectAdminDashboardPage() {
                                       >
                                         Reason: {String(p.rejectionReason)}
                                       </p>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3.5 text-center">
+                                    {p.uuid && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleOwnerLeadPermit(String(p.uuid), Boolean(p.allowOwnerLeadView))}
+                                        className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                                          p.allowOwnerLeadView
+                                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                                        }`}
+                                      >
+                                        {p.allowOwnerLeadView ? "Permitted" : "Permit Owner"}
+                                      </button>
                                     )}
                                   </td>
                                   <td className="px-4 py-3.5 text-right">

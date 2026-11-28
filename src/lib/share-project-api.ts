@@ -530,6 +530,39 @@ export async function getOwnerProjectInterestedLeads(projectUuid: string) {
   }>(res.data);
 }
 
+export interface BuyerLeadProjectDetail {
+  projectUuid: string;
+  projectName: string;
+  projectCode: string;
+  projectLocation: string;
+  viewCount: number;
+  isFavorited: boolean;
+  favoritedAt: string | null;
+  lastViewedAt: string | null;
+  timestamps: { viewedAt: string; ipAddress: string | null }[];
+}
+
+export interface BuyerInterestedLead {
+  buyerKey: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerPhone: string;
+  totalViews: number;
+  totalFavorites: number;
+  totalProjectsCount: number;
+  lastActivityAt: string;
+  projects: BuyerLeadProjectDetail[];
+}
+
+export async function getOwnerAllInterestedLeads() {
+  const res = await api.get(`${ROOT}/user/interested-leads`);
+  return unwrap<{
+    permittedProjectCount: number;
+    totalProjectCount: number;
+    leads: BuyerInterestedLead[];
+  }>(res.data);
+}
+
 export async function updateOwnerProjectThumbnailApi(projectUuid: string, thumbnailUrl: string) {
   const res = await api.patch(`${ROOT}/user/projects/${encodeURIComponent(projectUuid)}/thumbnail`, {
     thumbnailUrl,
