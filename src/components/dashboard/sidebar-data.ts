@@ -48,7 +48,7 @@ export const sidebarMenu: MenuGroup[] = [
         label: { bn: "সেলার পোর্টাল", en: "Seller Portal" },
         icon: FolderKanban,
         children: [
-          { label: { bn: "সেলার ড্যাশবোর্ড", en: "Seller Dashboard" }, href: "/dashboard/owner" },
+          { label: { bn: "সেলার ওভারভিউ", en: "Seller Overview" }, href: "/dashboard/owner" },
           { label: { bn: "ইন্টারেস্টেড লিডস", en: "Interested Leads" }, href: "/dashboard/owner/leads" },
         ],
       },
